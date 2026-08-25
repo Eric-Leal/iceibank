@@ -1,0 +1,13 @@
+# Node
+node_modules/
+agencia-express/data/*.jsonl
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Sistema
+Thumbs.db
+desktop.ini
