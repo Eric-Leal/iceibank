@@ -4,7 +4,21 @@
 
 1. **Por que o relógio de Lamport usa `max(contador_local, timestampRecebido) + 1` ao receber uma mensagem, em vez de simplesmente adotar o timestamp recebido diretamente?**
 
+   **Resposta:** A regra existe para o contador ficar **sempre maior que os dois valores** (o local e o recebido), e cada metade da fórmula resolve um problema.
+
+   O `max` impede que o contador **retroceda**: se a agência está em 10 e recebe 3, adotar o 3 faria eventos futuros dela receberem timestamps menores que eventos que ela já registrou, quebrando a ordem dos seus próprios eventos.
+
+   O `+ 1` garante que o recebimento seja **estritamente posterior** ao envio. Sem ele, envio e recebimento ficariam com o mesmo timestamp e a relação *happened-before* entre os dois sumiria do relógio. É isso que sustenta a ordem parcial de causa e efeito: se A aconteceu antes de B causalmente, então `timestamp(A) < timestamp(B)`.
+
+   No código, é o `ao_receber` de `relogio_lamport.py`, usado pela agência de destino quando recebe um crédito remoto de outra agência.
+
 2. **Se a Agência 0 está no evento de contador 10 e recebe uma mensagem com timestamp 3 (de uma agência mais "atrasada"), qual o novo valor do contador da Agência 0? O que isso implica sobre agências que processam muitos eventos rapidamente versus agências mais lentas?**
+
+   **Resposta:** `max(10, 3) + 1 = 11`. A mensagem atrasada não puxa a Agência 0 pra trás, ela só avança 1, como em qualquer evento local.
+
+   Isso significa que o ajuste só acontece **para cima**: a agência lenta salta pra frente ao receber mensagem de uma rápida, mas a rápida nunca é freada pela lenta. Como cada uma conta só os próprios eventos, duas agências rodando ao mesmo tempo podem ter contadores bem diferentes.
+
+   Ou seja, o contador não mede tempo real nem quantidade de trabalho, ele só garante a ordem de causa e efeito entre eventos que se comunicaram.
 
 ## Parte D (Transferências)
 
