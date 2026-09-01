@@ -4,7 +4,9 @@ import sys
 from fastapi import FastAPI
 
 import config
+from controllers.authController import router as auth_router
 from controllers.contasController import router as contas_router
+from controllers.transferenciasController import router as transferencias_router
 from services.registro_eventos import RegistroEventos
 from services.relogio_lamport import RelogioLamport
 
@@ -22,7 +24,9 @@ app.state.relogio = RelogioLamport()
 app.state.registro = RegistroEventos(f"agencia-{id_agencia}")
 app.state.contas = {}
 
+app.include_router(auth_router)
 app.include_router(contas_router)
+app.include_router(transferencias_router)
 
 
 if __name__ == "__main__":
