@@ -2,6 +2,7 @@ import os
 import sys
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 import config
 from controllers.authController import router as auth_router
@@ -18,6 +19,14 @@ if agencia_config is None:
     sys.exit(1)
 
 app = FastAPI(title=f"ICEIBank - Agencia {id_agencia}")
+
+# O frontend roda em outra porta, entao o navegador precisa da liberacao explicita.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=config.ORIGENS_FRONTEND,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 app.state.id_agencia = id_agencia
 app.state.relogio = RelogioLamport()

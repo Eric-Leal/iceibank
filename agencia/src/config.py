@@ -17,6 +17,9 @@ def agencia_responsavel(id_conta):
     return id_conta % NUMERO_AGENCIAS
 
 
+# Frontend (Parte G): origens autorizadas a chamar esta API pelo navegador
+ORIGENS_FRONTEND = ["http://localhost:5173"]
+
 # Autenticacao (Parte F)
 # A chave e lida do ambiente; o valor abaixo e so um padrao de desenvolvimento.
 JWT_SEGREDO = os.getenv("JWT_SEGREDO", "iceibank-sprint1-segredo-de-desenvolvimento")
