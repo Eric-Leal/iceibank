@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
 import AlertaMensagem from '@/components/AlertaMensagem.vue'
 import SeletorAgencia from '@/components/SeletorAgencia.vue'
@@ -8,13 +8,15 @@ import { loginCliente, loginOperador } from '@/services/api'
 import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
+const route = useRoute()
 const auth = useAuthStore()
 
 const perfil = ref<'cliente' | 'operador'>('cliente')
 const idConta = ref<number>(0)
 const usuario = ref('operador')
 const senha = ref('')
-const erro = ref('')
+// Quem chega aqui por um 401 traz o motivo na query, senao a mensagem se perderia na troca de tela.
+const erro = ref(String(route.query.erro ?? ''))
 const carregando = ref(false)
 
 async function entrar() {

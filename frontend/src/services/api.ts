@@ -30,9 +30,11 @@ api.interceptors.response.use(
     const detalhe = erro.response?.data?.detail
 
     if (erro.response?.status === 401) {
+      const mensagem = detalhe ?? 'Sessao expirada. Faca login novamente.'
       useAuthStore().sair()
-      router.push('/login')
-      return Promise.reject(new Error(detalhe ?? 'Sessao expirada. Faca login novamente.'))
+      // A mensagem vai na query porque a troca de tela remonta o LoginView e zera o estado local.
+      router.push({ name: 'login', query: { erro: mensagem } })
+      return Promise.reject(new Error(mensagem))
     }
 
     if (detalhe) return Promise.reject(new Error(detalhe))
