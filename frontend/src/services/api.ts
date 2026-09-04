@@ -78,11 +78,17 @@ export async function sacar(id: number, valor: number) {
   return data
 }
 
-export async function transferir(idOrigem: number, idDestino: number, valor: number) {
+export async function transferir(
+  idOrigem: number,
+  idDestino: number,
+  valor: number,
+  idOperacao: string,
+) {
   const { data } = await api.post<RespostaTransferencia>('/transferencias', {
     idOrigem,
     idDestino,
     valor,
+    idOperacao,
   })
   return data
 }

@@ -32,6 +32,8 @@ app.state.id_agencia = id_agencia
 app.state.relogio = RelogioLamport()
 app.state.registro = RegistroEventos(f"agencia-{id_agencia}")
 app.state.contas = {}
+# Resultado das transferencias ja aplicadas, indexado pelo idOperacao (idempotencia).
+app.state.transferencias_aplicadas = {}
 
 app.include_router(auth_router)
 app.include_router(contas_router)

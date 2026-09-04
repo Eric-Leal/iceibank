@@ -40,7 +40,7 @@ Banco simplificado dividido em agências independentes, com API REST em arquitet
 
 ## Uso de IA
 
-- **Claude (Anthropic)**: usado para preparar o ambiente (estruturação de pastas, configuração do projeto FastAPI), traduzir para Python o código de referência que o roteiro fornece em Node.js/Express, verificar e corrigir o código implementado, ajudar na construção e no ajuste do frontend em Vue, complementar/ajudar na formulação das respostas de [`RESPOSTAS.md`](RESPOSTAS.md) e ajudar a organizar e criar os commits do Git.
+- **Claude (Anthropic)**: usado para preparar o ambiente (estruturação de pastas, configuração do projeto FastAPI), traduzir para Python o código de referência que o roteiro fornece em Node.js/Express, verificar e corrigir o código implementado, ajudar na construção e no ajuste do frontend em Vue, implementar a funcionalidade adicional de idempotência das transferências, complementar/ajudar na formulação das respostas de [`RESPOSTAS.md`](RESPOSTAS.md) e ajudar a organizar e criar os commits do Git.
 - **Pesquisa no Google (Gemini)**: usada para consultar conceitos de sistemas distribuídos (relógio de Lamport, atomicidade em transações distribuídas) e o funcionamento de JWT, abordados nas perguntas do roteiro.
 
 ## Contexto Acadêmico

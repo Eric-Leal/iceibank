@@ -204,4 +204,23 @@ Nada na transferência distingue a mesma operação chegando duas vezes de duas 
 
 É a idempotência de transferências que o roteiro cita na seção 2.1: usar um identificador único por operação para evitar que a mesma transferência seja aplicada duas vezes se a requisição for reenviada.
 
-Descrição da funcionalidade escolhida e justificativa:
+**Funcionalidade escolhida: idempotência de transferências**
+
+Escolhi essa porque o problema apareceu sozinho no meu próprio teste, então eu sabia exatamente o que precisava resolver.
+
+**O que ela faz.** A transferência passou a aceitar um campo `idOperacao`, um identificador único daquela operação. A agência guarda os ids que já processou em `app.state.transferencias_aplicadas`. Se chegar uma requisição com um id repetido, ela devolve o resultado da primeira sem debitar de novo, e registra o evento `TRANSFERENCIA_IGNORADA` no log.
+
+O id é gerado no frontend com `crypto.randomUUID()` quando a tela de transferência abre, e só é trocado depois de uma transferência dar certo. Isso é o que faz a coisa funcionar: dois cliques na mesma transferência mandam o mesmo id, enquanto duas transferências diferentes mandam ids diferentes.
+
+O campo é opcional. Sem ele, a rota se comporta como antes, então as chamadas por `Invoke-RestMethod` que já estavam nas outras evidências continuam valendo.
+
+**Teste.** Repeti o clique duplo que tinha causado o problema. Agora o segundo clique não debita nada, o saldo fica igual, e o log mostra a requisição repetida sendo recusada:
+
+```
+agencia-0: [Lamport 7] TRANSFERENCIA_DEBITO    {idOrigem: 0, idDestino: 1, valor: 40.0}
+agencia-0: [Lamport 8] TRANSFERENCIA_IGNORADA  {idOperacao: "...", idOrigem: 0, idDestino: 1}
+```
+
+Evidência em [`funcionalidade-adicional.png`](evidencias/sprint1/funcionalidade-adicional.png).
+
+**Limite conhecido.** Os ids ficam em memória, junto com as contas, então somem se a agência reiniciar. Faz sentido no escopo deste sprint, que não tem banco de dados.

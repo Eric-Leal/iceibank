@@ -14,6 +14,9 @@ const valor = ref<number>(0)
 const erro = ref('')
 const sucesso = ref('')
 
+// Nasce com a intencao de transferir, nao com o envio: dois cliques mandam o mesmo id.
+const idOperacao = ref(crypto.randomUUID())
+
 // A conta de destino pode estar em outra agencia. Quem resolve isso e o backend,
 // mas mostramos o tipo previsto na tela para deixar a diferenca visivel.
 const tipoTransferencia = computed(() =>
@@ -26,9 +29,15 @@ async function enviar() {
   erro.value = ''
   sucesso.value = ''
   try {
-    const resposta = await transferir(idOrigem.value, idDestino.value, valor.value)
+    const resposta = await transferir(
+      idOrigem.value,
+      idDestino.value,
+      valor.value,
+      idOperacao.value,
+    )
     sucesso.value = resposta.mensagem
     valor.value = 0
+    idOperacao.value = crypto.randomUUID()
   } catch (e) {
     erro.value = (e as Error).message
   }

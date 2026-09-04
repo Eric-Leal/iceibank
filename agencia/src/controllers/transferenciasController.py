@@ -12,6 +12,7 @@ class Transferencia(BaseModel):
     idOrigem: int
     idDestino: int
     valor: float
+    idOperacao: str | None = None
 
 
 class CreditoRemoto(BaseModel):
@@ -20,11 +21,31 @@ class CreditoRemoto(BaseModel):
     origemAgencia: int
 
 
+def registrar_conclusao(estado, id_operacao, resposta):
+    if id_operacao:
+        estado.transferencias_aplicadas[id_operacao] = resposta
+    return resposta
+
+
 @router.post("/transferencias")
 def transferir(dados: Transferencia, request: Request, token=Depends(auth.autenticado)):
     auth.exige_dono(token, dados.idOrigem)
 
     estado = request.app.state
+
+    # Idempotencia: a mesma operacao reenviada nao pode debitar duas vezes.
+    if dados.idOperacao and dados.idOperacao in estado.transferencias_aplicadas:
+        estado.registro.registrar(
+            "TRANSFERENCIA_IGNORADA",
+            estado.relogio.evento_local(),
+            {
+                "idOperacao": dados.idOperacao,
+                "idOrigem": dados.idOrigem,
+                "idDestino": dados.idDestino,
+                "valor": dados.valor,
+            },
+        )
+        return estado.transferencias_aplicadas[dados.idOperacao]
 
     conta_origem = estado.contas.get(dados.idOrigem)
     if not conta_origem:
@@ -57,7 +78,9 @@ def transferir(dados: Transferencia, request: Request, token=Depends(auth.autent
             ts_credito,
             {"idOrigem": dados.idOrigem, "idDestino": dados.idDestino, "valor": dados.valor},
         )
-        return {"mensagem": "Transferencia concluida (mesma agencia)."}
+        return registrar_conclusao(
+            estado, dados.idOperacao, {"mensagem": "Transferencia concluida (mesma agencia)."}
+        )
 
     # Caso entre agencias: chama a agencia de destino diretamente via REST
     ts_envio = estado.relogio.ao_enviar()
@@ -79,7 +102,9 @@ def transferir(dados: Transferencia, request: Request, token=Depends(auth.autent
             timeout=5,
         )
         resposta.raise_for_status()
-        return {"mensagem": "Transferencia concluida (entre agencias)."}
+        return registrar_conclusao(
+            estado, dados.idOperacao, {"mensagem": "Transferencia concluida (entre agencias)."}
+        )
     except requests.RequestException as erro:
         # LIMITACAO CONHECIDA: se esta chamada falhar, o debito ja aplicado acima
         # NAO e revertido - o dinheiro "desaparece" temporariamente. Resolver isso
