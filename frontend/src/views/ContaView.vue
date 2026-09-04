@@ -67,11 +67,17 @@ onMounted(() => {
 
 <template>
   <div class="mx-auto max-w-xl space-y-6">
+    <AlertaMensagem :erro="erro" :sucesso="sucesso" />
+
     <section class="rounded-xl border border-slate-200 bg-white p-6">
       <h2 class="mb-4 text-xl font-semibold text-slate-800">Consultar saldo</h2>
 
+      <label for="conta-busca" class="mb-1 block text-sm font-medium text-slate-700">
+        Numero da conta
+      </label>
       <div class="flex gap-2">
         <input
+          id="conta-busca"
           v-model.number="idBusca"
           type="number"
           :disabled="auth.tipo === 'cliente'"
@@ -94,12 +100,15 @@ onMounted(() => {
     <section v-if="conta" class="rounded-xl border border-slate-200 bg-white p-6">
       <h2 class="mb-4 text-xl font-semibold text-slate-800">Deposito e saque</h2>
 
+      <label for="valor-operacao" class="mb-1 block text-sm font-medium text-slate-700">
+        Valor
+      </label>
       <div class="flex gap-2">
         <input
+          id="valor-operacao"
           v-model.number="valor"
           type="number"
           step="0.01"
-          placeholder="Valor"
           class="flex-1 rounded-lg border border-slate-300 px-3 py-2"
         />
         <button
@@ -121,33 +130,44 @@ onMounted(() => {
       <h2 class="mb-4 text-xl font-semibold text-slate-800">Abrir conta</h2>
 
       <form @submit.prevent="abrirConta" class="grid grid-cols-2 gap-3">
-        <input
-          v-model.number="novaConta.id"
-          type="number"
-          placeholder="Numero"
-          required
-          class="rounded-lg border border-slate-300 px-3 py-2"
-        />
-        <input
-          v-model="novaConta.nomeAluno"
-          placeholder="Nome"
-          required
-          class="rounded-lg border border-slate-300 px-3 py-2"
-        />
-        <input
-          v-model="novaConta.senha"
-          type="password"
-          placeholder="Senha"
-          required
-          class="rounded-lg border border-slate-300 px-3 py-2"
-        />
-        <input
-          v-model.number="novaConta.saldoInicial"
-          type="number"
-          step="0.01"
-          placeholder="Saldo inicial"
-          class="rounded-lg border border-slate-300 px-3 py-2"
-        />
+        <label class="block">
+          <span class="mb-1 block text-sm font-medium text-slate-700">Numero da conta</span>
+          <input
+            v-model.number="novaConta.id"
+            type="number"
+            required
+            class="w-full rounded-lg border border-slate-300 px-3 py-2"
+          />
+        </label>
+
+        <label class="block">
+          <span class="mb-1 block text-sm font-medium text-slate-700">Nome do aluno</span>
+          <input
+            v-model="novaConta.nomeAluno"
+            required
+            class="w-full rounded-lg border border-slate-300 px-3 py-2"
+          />
+        </label>
+
+        <label class="block">
+          <span class="mb-1 block text-sm font-medium text-slate-700">Senha de acesso</span>
+          <input
+            v-model="novaConta.senha"
+            type="password"
+            required
+            class="w-full rounded-lg border border-slate-300 px-3 py-2"
+          />
+        </label>
+
+        <label class="block">
+          <span class="mb-1 block text-sm font-medium text-slate-700">Saldo inicial (R$)</span>
+          <input
+            v-model.number="novaConta.saldoInicial"
+            type="number"
+            step="0.01"
+            class="w-full rounded-lg border border-slate-300 px-3 py-2"
+          />
+        </label>
         <button
           type="submit"
           class="col-span-2 rounded-lg bg-sky-600 px-4 py-2 font-medium text-white hover:bg-sky-700"
@@ -156,7 +176,5 @@ onMounted(() => {
         </button>
       </form>
     </section>
-
-    <AlertaMensagem :erro="erro" :sucesso="sucesso" />
   </div>
 </template>
