@@ -149,10 +149,59 @@ Então a agência de origem gera, na hora da chamada, um token com `tipo: "servi
 
 1. **Como o frontend "lembra" de reenviar o token em cada requisição depois do login?**
 
+   **Resposta:** Por um interceptor de request do axios, em `services/api.ts`. Toda requisição passa por ele antes de sair, e ele faz duas coisas: define o `baseURL` para a agência escolhida no login e injeta o cabeçalho `Authorization: Bearer <token>`.
+
+   O token em si vive na store do Pinia (`stores/auth.ts`), que lê o `localStorage` quando a aplicação carrega. Por isso a sessão sobrevive a um F5: o estado é recuperado do `localStorage`, não do zero.
+
+   O ganho prático é que nenhuma tela monta cabeçalho na mão. `ContaView` chama `consultarSaldo(0)` e não sabe que existe token; quem cuida disso é uma camada só, num lugar só. Se eu precisasse trocar o esquema de autenticação, mexeria em um arquivo.
+
 2. **Se o token expirar enquanto alguém está usando o frontend no meio de uma operação, o que acontece na sua implementação?**
+
+   **Resposta:** Um interceptor de response captura o erro. Quando a resposta é 401, ele limpa a sessão (`sair()` apaga token, tipo e id da conta, tanto da store quanto do `localStorage`) e redireciona para `/login` levando junto a mensagem que o backend devolveu.
+
+   Testei gerando um token com validade negativa e colocando ele no `localStorage` no lugar do válido. O console do navegador registra a resposta como `401 (Unauthorized)`, que é o nome do status HTTP, e no corpo vem o detalhe `Token expirado.`, que é o que a tela mostra numa faixa vermelha. A pessoa lê o motivo, não um erro genérico. Evidência em [`frontend-token-expirado.png`](evidencias/sprint1/frontend-token-expirado.png).
+
+   Na primeira versão a mensagem se perdia. O interceptor gerava o texto certo, mas ir para `/login` monta o `LoginView` de novo, e o estado local dele nasce vazio, então a pessoa era expulsa da sessão sem explicação nenhuma e o 401 só aparecia no console do navegador. Descobri isso testando, não lendo o código. Corrigi passando a mensagem pela query da rota (`/login?erro=Token+expirado.`), que o `LoginView` lê ao montar. Escolhi a query justamente porque ela sobrevive à troca de tela e a um refresh, que era o ponto onde a mensagem morria.
 
 3. **No seu frontend, onde fica o "M" (Model), o "V" (View) e o "C" (Controller)?**
 
+   **Resposta:** Separei por pasta:
+
+   - **Model**: `types/index.ts` (os tipos `Conta` e `RespostaLogin`, e a regra de partição `id % 3`), `services/api.ts` (todo o acesso à API) e `stores/auth.ts` (o estado da sessão).
+   - **View**: `views/` e `components/`, ou seja, os blocos `<template>`. `AlertaMensagem` e `SeletorAgencia` são View reaproveitada em mais de uma tela.
+   - **Controller**: o `<script setup>` de cada view. Em `ContaView.vue` são as funções `buscar()`, `operar()` e `abrirConta()`: recebem o evento do usuário, chamam o Model, guardam o resultado e decidem se mostram erro ou sucesso.
+
+   O código não ficou tão separado quanto o padrão sugere, e acho que não deveria ficar. Em Vue o Controller não é uma camada com pasta própria: ele mora no mesmo arquivo da View, dentro do `<script setup>`, e parte dele escorre para a store. A separação existe por responsabilidade, não por arquivo.
+
+**Decisões de design (escolha do framework, onde guardar o token)**
+
+**Escolha do framework.** Vue 3 com Vite e TypeScript.
+
+Escolhi Vue para já ir aprendendo o framework, porque vamos usar ele também no trabalho interdisciplinar.
+
+**Onde guardar o token.** No `localStorage`, junto com o tipo de perfil, o id da conta e a agência escolhida.
+
+Escolhi assim para a sessão sobreviver a um refresh. Guardar só na memória seria mais seguro, mas eu perderia o login a cada F5, e recarreguei a página o tempo todo testando.
+
+O risco é que qualquer script rodando na página consegue ler o token. O que limita o estrago é a expiração de 30 minutos.
+
+Evidências do fluxo completo pela interface: [`frontend-login.png`](evidencias/sprint1/frontend-login.png), [`frontend-particao.png`](evidencias/sprint1/frontend-particao.png), [`frontend-deposito.png`](evidencias/sprint1/frontend-deposito.png), [`frontend-saque.png`](evidencias/sprint1/frontend-saque.png), [`frontend-transferencia-local.png`](evidencias/sprint1/frontend-transferencia-local.png), [`frontend-transferencia.png`](evidencias/sprint1/frontend-transferencia.png), [`frontend-erro.png`](evidencias/sprint1/frontend-erro.png) e [`frontend-token-expirado.png`](evidencias/sprint1/frontend-token-expirado.png).
+
 ## Funcionalidade adicional (seção 2.1)
+
+**Observação levantada durante os testes da Parte G**
+
+Testando a transferência pela interface, cliquei duas vezes em **Transferir** sem querer. O sistema aplicou a transferência duas vezes: saíram R$ 80,00 da conta 0 em vez de R$ 40,00. O log da agência 0 mostra os dois débitos, e a agência 1 mostra os dois créditos correspondentes:
+
+```
+agencia-0: [Lamport 7] TRANSFERENCIA_DEBITO {idOrigem: 0, idDestino: 1, valor: 40.0}
+agencia-0: [Lamport 9] TRANSFERENCIA_DEBITO {idOrigem: 0, idDestino: 1, valor: 40.0}
+agencia-1: [Lamport 9]  TRANSFERENCIA_CREDITO_REMOTO {idConta: 1, valor: 40.0}
+agencia-1: [Lamport 11] TRANSFERENCIA_CREDITO_REMOTO {idConta: 1, valor: 40.0}
+```
+
+Nada na transferência distingue a mesma operação chegando duas vezes de duas transferências iguais, então a agência aplicou as duas.
+
+É a idempotência de transferências que o roteiro cita na seção 2.1: usar um identificador único por operação para evitar que a mesma transferência seja aplicada duas vezes se a requisição for reenviada.
 
 Descrição da funcionalidade escolhida e justificativa:

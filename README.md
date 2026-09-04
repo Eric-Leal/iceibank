@@ -40,7 +40,7 @@ Banco simplificado dividido em agências independentes, com API REST em arquitet
 
 ## Uso de IA
 
-- **Claude (Anthropic)**: usado para preparar o ambiente (estruturação de pastas, configuração do projeto FastAPI), traduzir para Python o código de referência que o roteiro fornece em Node.js/Express, verificar e corrigir o código implementado, complementar/ajudar na formulação das respostas de [`RESPOSTAS.md`](RESPOSTAS.md) e ajudar a organizar e criar os commits do Git.
+- **Claude (Anthropic)**: usado para preparar o ambiente (estruturação de pastas, configuração do projeto FastAPI), traduzir para Python o código de referência que o roteiro fornece em Node.js/Express, verificar e corrigir o código implementado, ajudar na construção e no ajuste do frontend em Vue, complementar/ajudar na formulação das respostas de [`RESPOSTAS.md`](RESPOSTAS.md) e ajudar a organizar e criar os commits do Git.
 - **Pesquisa no Google (Gemini)**: usada para consultar conceitos de sistemas distribuídos (relógio de Lamport, atomicidade em transações distribuídas) e o funcionamento de JWT, abordados nas perguntas do roteiro.
 
 ## Contexto Acadêmico
@@ -66,6 +66,7 @@ Funcionalidades do Sprint 1:
 - Registro de todos os eventos com timestamp de relógio lógico de Lamport
 - Linha do tempo unificada, mesclando os logs das três agências
 - Autenticação e autorização via JWT
+- Interface web consumindo a API autenticada, com escolha da agência de acesso
 
 ## Escolha de Linguagem
 
@@ -104,7 +105,7 @@ Agencia de origem (dona da conta de origem)
                                     Agencia de destino
 ```
 
-### Camadas
+### Camadas do backend
 
 | Camada | Responsabilidade | Arquivos |
 | --- | --- | --- |
@@ -114,6 +115,16 @@ Agencia de origem (dona da conta de origem)
 | Aplicação | Composição do estado e registro dos routers | `main.py` |
 
 O estado de cada agência (contas, relógio e registro de eventos) vive em `app.state`, criado no boot. As contas ficam em memória, sem banco de dados, conforme o escopo do sprint.
+
+### Camadas do frontend
+
+| Camada (MVC) | Responsabilidade | Arquivos |
+| --- | --- | --- |
+| Model | Tipos, acesso à API e estado da sessão | `types/`, `services/api.ts`, `stores/auth.ts` |
+| View | Telas e componentes reaproveitáveis | `views/`, `components/` |
+| Controller | Reação aos eventos da tela | `<script setup>` de cada view |
+
+O token é injetado em toda requisição por um interceptor do axios, e um segundo interceptor derruba a sessão e leva a pessoa de volta ao login quando a API responde 401.
 
 ## Relógio de Lamport
 
@@ -176,7 +187,13 @@ Isso é intencional neste sprint: é exatamente o problema que o Sprint 4 resolv
 
 ### Frontend
 
-- Vue (Parte G, em desenvolvimento)
+- Vue `3.5`
+- Vite `8` (servidor de desenvolvimento e build)
+- TypeScript `6`
+- Vue Router `5` (rotas e proteção das telas internas)
+- Pinia `4` (estado da sessão: token, perfil e agência escolhida)
+- axios `1.20` (chamadas à API, com os interceptors de token e de erro)
+- Tailwind CSS `4`
 
 ### Referência de estudo
 
@@ -186,7 +203,8 @@ Isso é intencional neste sprint: é exatamente o problema que o Sprint 4 resolv
 
 ```text
 iceibank/
-├── agencia/                    # entrega (Python + FastAPI)
+├── agencia/                    # backend (Python + FastAPI), roda 3 vezes
+├── frontend/                   # interface web (Vue + Vite)
 ├── agencia-express/            # referencia do roteiro (Node.js), apenas estudo
 ├── evidencias/sprint1/         # prints de execucao
 ├── RESPOSTAS.md                # respostas das questoes do roteiro
@@ -215,19 +233,51 @@ agencia/
         └── auth.py             # geracao e validacao de tokens
 ```
 
+### Frontend
+
+```text
+frontend/
+├── package.json
+├── vite.config.ts
+└── src/
+    ├── main.ts
+    ├── App.vue                 # layout, navegacao e botao sair
+    ├── router/index.ts         # rotas e bloqueio das telas internas sem token
+    ├── types/index.ts          # tipos e a regra de particionamento id % 3
+    ├── services/api.ts         # axios, injecao do token e tratamento de erro
+    ├── stores/auth.ts          # sessao (token, perfil, conta, agencia)
+    ├── components/
+    │   ├── AlertaMensagem.vue  # faixa de erro ou sucesso
+    │   └── SeletorAgencia.vue  # escolha da agencia de acesso
+    └── views/
+        ├── LoginView.vue       # login de cliente ou operador
+        ├── ContaView.vue       # saldo, deposito, saque e abertura de conta
+        └── TransferenciaView.vue
+```
+
 ## Como Rodar o Projeto
 
 ### Pré-requisitos
 
 - Python 3.12 ou superior
+- Node.js 22.18 ou superior (para o frontend)
 - Git
 
 ### 1. Preparar o ambiente
+
+Backend:
 
 ```powershell
 cd agencia
 python -m venv .venv
 .venv\Scripts\python.exe -m pip install -r requirements.txt
+```
+
+Frontend:
+
+```powershell
+cd frontend
+npm install
 ```
 
 ### 2. Subir as três agências
@@ -240,9 +290,20 @@ $env:AGENCIA_ID=1; .venv\Scripts\python.exe src\main.py
 $env:AGENCIA_ID=2; .venv\Scripts\python.exe src\main.py
 ```
 
-### 3. Autenticar e operar
+### 3. Abrir a interface web
 
 Em um quarto terminal:
+
+```powershell
+cd frontend
+npm run dev
+```
+
+A interface fica em `http://localhost:5173`, que é a única origem liberada no CORS das agências (`ORIGENS_FRONTEND` em `config.py`). O login de operador é `operador` / `iceibank123`; o de cliente é o número da conta e a senha definida na criação. O seletor na tela de login escolhe por qual das três agências o acesso entra.
+
+### 4. Autenticar e operar pela API
+
+Alternativa à interface, em um quinto terminal:
 
 ```powershell
 $op = Invoke-RestMethod -Uri "http://localhost:8081/auth/login-operador" -Method Post -ContentType "application/json" -Body '{"usuario":"operador","senha":"iceibank123"}'
@@ -252,7 +313,7 @@ Invoke-RestMethod -Uri "http://localhost:8081/contas" -Method Post -Headers $h -
 Invoke-RestMethod -Uri "http://localhost:8081/contas/0" -Headers $h
 ```
 
-### 4. Ver a linha do tempo unificada
+### 5. Ver a linha do tempo unificada
 
 ```powershell
 .venv\Scripts\python.exe mesclar_logs.py
@@ -271,6 +332,14 @@ Prints de execução real, com a saída de `Get-Date` visível, em `evidencias/s
 | `auth-sem-token.png` | rotas protegidas rejeitando requisições sem token e com token inválido (401) |
 | `auth-com-token.png` | fluxo autenticado funcionando e bloqueio de acesso a conta alheia (403) |
 | `auth-token-expirado.png` | token expirado rejeitado com 401 |
+| `frontend-login.png` | tela de login, com seletor de agência e perfil de operador |
+| `frontend-particao.png` | agência 1 recusando a criação de uma conta que não é dela |
+| `frontend-deposito.png` | depósito pela interface, com o evento no log da agência |
+| `frontend-saque.png` | saque pela interface, com o evento no log da agência |
+| `frontend-transferencia-local.png` | transferência entre contas da mesma agência, pela interface |
+| `frontend-transferencia.png` | transferência entre agências, com o log das duas agências envolvidas |
+| `frontend-erro.png` | saldo insuficiente exibido na tela, não só no console |
+| `frontend-token-expirado.png` | token expirado derrubando a sessão, com o motivo visível na tela |
 
 ## Documentação do Projeto
 
