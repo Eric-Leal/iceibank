@@ -224,3 +224,9 @@ agencia-0: [Lamport 8] TRANSFERENCIA_IGNORADA  {idOperacao: "...", idOrigem: 0, 
 Evidência em [`funcionalidade-adicional.png`](evidencias/sprint1/funcionalidade-adicional.png).
 
 **Limite conhecido.** Os ids ficam em memória, junto com as contas, então somem se a agência reiniciar. Faz sentido no escopo deste sprint, que não tem banco de dados.
+
+## Vídeo de apresentação
+
+[`evidencias/videos/apresentacao-sprint1.mp4`](evidencias/videos/apresentacao-sprint1.mp4)
+
+Percorre o sistema rodando e as decisões de projeto: partição das contas entre as três agências, relógio de Lamport nas três regras, transferência local e entre agências, autenticação com JWT, o frontend consumindo a API autenticada, a idempotência das transferências e a limitação conhecida sob falha.
