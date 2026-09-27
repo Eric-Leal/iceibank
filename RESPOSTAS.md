@@ -31,12 +31,16 @@
    [Lamport 4] TRANSFERENCIA_CREDITO {idOrigem: 0, idDestino: 3}
    ```
 
+   ![Transferência local, débito e crédito no mesmo relógio](evidencias/sprint1/transferencia-local.png)
+
    Já entre agências existem dois relógios independentes que nunca se falaram. A origem usa `ao_enviar()` e manda o valor junto da requisição; o destino usa `ao_receber(ts)` = `max(local, recebido) + 1`. Sem isso, a agência de destino registraria o crédito com um número baseado só no próprio histórico, e o crédito poderia acabar com timestamp menor que o débito que o causou. No teste, a agência 1 estava em 1 e recebeu 6, virando `max(1, 6) + 1 = 7`:
 
    ```
    agencia-0: [Lamport 5] TRANSFERENCIA_DEBITO          (envio saiu com 6)
    agencia-1: [Lamport 7] TRANSFERENCIA_CREDITO_REMOTO
    ```
+
+   ![Transferência entre agências, com o ajuste do relógio no destino](evidencias/sprint1/transferencia-entre-agencias.png)
 
 2. **Reproduza a falha conhecida e observe o saldo da conta de origem depois do erro. Ele foi revertido? O que isso significa em termos de consistência do sistema bancário?**
 
@@ -46,6 +50,8 @@
    [Lamport 7] TRANSFERENCIA_DEBITO  {idOrigem: 0, idDestino: 1, valor: 30.0}
    [Lamport 9] TRANSFERENCIA_FALHOU  {erro: "... [WinError 10061] ..."}
    ```
+
+   ![Agência de destino fora do ar, resposta 502 e débito não revertido](evidencias/sprint1/falha-conhecida.png)
 
    Em termos de consistência, o sistema ficou num estado inválido: os 30 saíram da conta de origem e não entraram em lugar nenhum. Somando o dinheiro de todas as agências, o total do banco diminuiu sem que ninguém tenha sacado. A operação deveria ser atômica (ou acontece inteira, ou não acontece), mas aqui ela é composta por duas etapas independentes, em máquinas diferentes, e só a primeira foi aplicada. O sistema sabe que isso aconteceu, já que registrou `TRANSFERENCIA_FALHOU`, mas não tem nenhum mecanismo para desfazer o débito.
 
@@ -81,6 +87,8 @@ A ordem por `horaParede` **não bate** com a ordem por Lamport. O caso mais clar
 
 O evento de timestamp 2 aconteceu quase 8 minutos **antes** do evento de timestamp 1, mas aparece depois na lista ordenada por Lamport. Isso confirma que o relógio lógico não tenta representar tempo real: ele só garante a ordem entre eventos que realmente têm relação causal.
 
+![Linha do tempo unificada das três agências](evidencias/sprint1/linha-do-tempo.png)
+
 1. **O relógio de Lamport garante que, se A aconteceu antes de B causalmente, `timestamp(A) < timestamp(B)`. Ele não garante a volta. O que isso significa na prática quando você vê dois eventos com timestamps diferentes na linha do tempo, mas sem saber se um realmente influenciou o outro?**
 
    **Resposta:** Significa que `timestamp(A) < timestamp(B)` não permite concluir que A causou B. A garantia vale só num sentido: se houve causalidade, os timestamps estão em ordem; mas timestamps em ordem podem ser apenas coincidência entre eventos independentes.
@@ -108,7 +116,17 @@ O evento de timestamp 2 aconteceu quase 8 minutos **antes** do evento de timesta
 
    Existem ainda dois níveis acima do cliente: `exige_operador()`, para criar contas, e `exige_servico()`, para a rota interna entre agências.
 
-   Evidências: `evidencias/sprint1/auth-sem-token.png`, `auth-com-token.png` e `auth-token-expirado.png`.
+   Sem token e com token inválido, 401:
+
+   ![Rotas protegidas rejeitando requisições sem token](evidencias/sprint1/auth-sem-token.png)
+
+   Com token válido funciona, e acessar conta alheia dá 403:
+
+   ![Fluxo autenticado e bloqueio de conta alheia](evidencias/sprint1/auth-com-token.png)
+
+   Token expirado, 401:
+
+   ![Token expirado rejeitado](evidencias/sprint1/auth-token-expirado.png)
 
 2. **Por que o servidor não precisa consultar um banco de dados para validar a assinatura de um JWT a cada requisição? O que isso implica sobre escalabilidade?**
 
@@ -159,7 +177,9 @@ Então a agência de origem gera, na hora da chamada, um token com `tipo: "servi
 
    **Resposta:** Um interceptor de response captura o erro. Quando a resposta é 401, ele limpa a sessão (`sair()` apaga token, tipo e id da conta, tanto da store quanto do `localStorage`) e redireciona para `/login` levando junto a mensagem que o backend devolveu.
 
-   Testei gerando um token com validade negativa e colocando ele no `localStorage` no lugar do válido. O console do navegador registra a resposta como `401 (Unauthorized)`, que é o nome do status HTTP, e no corpo vem o detalhe `Token expirado.`, que é o que a tela mostra numa faixa vermelha. A pessoa lê o motivo, não um erro genérico. Evidência em [`frontend-token-expirado.png`](evidencias/sprint1/frontend-token-expirado.png).
+   Testei gerando um token com validade negativa e colocando ele no `localStorage` no lugar do válido. O console do navegador registra a resposta como `401 (Unauthorized)`, que é o nome do status HTTP, e no corpo vem o detalhe `Token expirado.`, que é o que a tela mostra numa faixa vermelha. A pessoa lê o motivo, não um erro genérico.
+
+   ![Token expirado derrubando a sessão, com o motivo na tela](evidencias/sprint1/frontend-token-expirado.png)
 
    Na primeira versão a mensagem se perdia. O interceptor gerava o texto certo, mas ir para `/login` monta o `LoginView` de novo, e o estado local dele nasce vazio, então a pessoa era expulsa da sessão sem explicação nenhuma e o 401 só aparecia no console do navegador. Descobri isso testando, não lendo o código. Corrigi passando a mensagem pela query da rota (`/login?erro=Token+expirado.`), que o `LoginView` lê ao montar. Escolhi a query justamente porque ela sobrevive à troca de tela e a um refresh, que era o ponto onde a mensagem morria.
 
@@ -185,7 +205,31 @@ Escolhi assim para a sessão sobreviver a um refresh. Guardar só na memória se
 
 O risco é que qualquer script rodando na página consegue ler o token. O que limita o estrago é a expiração de 30 minutos.
 
-Evidências do fluxo completo pela interface: [`frontend-login.png`](evidencias/sprint1/frontend-login.png), [`frontend-particao.png`](evidencias/sprint1/frontend-particao.png), [`frontend-deposito.png`](evidencias/sprint1/frontend-deposito.png), [`frontend-saque.png`](evidencias/sprint1/frontend-saque.png), [`frontend-transferencia-local.png`](evidencias/sprint1/frontend-transferencia-local.png), [`frontend-transferencia.png`](evidencias/sprint1/frontend-transferencia.png), [`frontend-erro.png`](evidencias/sprint1/frontend-erro.png) e [`frontend-token-expirado.png`](evidencias/sprint1/frontend-token-expirado.png).
+**Evidências do fluxo completo pela interface**
+
+Login:
+
+![Tela de login](evidencias/sprint1/frontend-login.png)
+
+Agência recusando conta que não é dela:
+
+![Agência 1 recusando a conta 2](evidencias/sprint1/frontend-particao.png)
+
+Depósito e saque:
+
+![Depósito pela interface](evidencias/sprint1/frontend-deposito.png)
+
+![Saque pela interface](evidencias/sprint1/frontend-saque.png)
+
+Transferência local e entre agências:
+
+![Transferência na mesma agência](evidencias/sprint1/frontend-transferencia-local.png)
+
+![Transferência entre agências](evidencias/sprint1/frontend-transferencia.png)
+
+Erro visível na tela:
+
+![Saldo insuficiente exibido na tela](evidencias/sprint1/frontend-erro.png)
 
 ## Funcionalidade adicional (seção 2.1)
 
@@ -221,7 +265,7 @@ agencia-0: [Lamport 7] TRANSFERENCIA_DEBITO    {idOrigem: 0, idDestino: 1, valor
 agencia-0: [Lamport 8] TRANSFERENCIA_IGNORADA  {idOperacao: "...", idOrigem: 0, idDestino: 1}
 ```
 
-Evidência em [`funcionalidade-adicional.png`](evidencias/sprint1/funcionalidade-adicional.png).
+![Mesma transferência enviada duas vezes, debitada uma vez só](evidencias/sprint1/funcionalidade-adicional.png)
 
 **Limite conhecido.** Os ids ficam em memória, junto com as contas, então somem se a agência reiniciar. Faz sentido no escopo deste sprint, que não tem banco de dados.
 
