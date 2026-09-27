@@ -206,9 +206,13 @@ iceibank/
 ├── agencia/                    # backend (Python + FastAPI), roda 3 vezes
 ├── frontend/                   # interface web (Vue + Vite)
 ├── agencia-express/            # referencia do roteiro (Node.js), apenas estudo
-├── evidencias/sprint1/         # prints de execucao
+├── evidencias/
+│   ├── sprint1/                # prints do Sprint 1
+│   ├── sprint2/                # prints do Sprint 2
+│   └── videos/                 # videos de apresentacao
 ├── RESPOSTAS.md                # respostas das questoes do roteiro
-├── ROTEIRO.md                  # enunciado do sprint
+├── ROTEIRO-SPRINT1.md          # enunciado do Sprint 1
+├── ROTEIRO-SPRINT2.md          # enunciado do Sprint 2
 └── README.md
 ```
 
@@ -346,7 +350,8 @@ Prints de execução real, com a saída de `Get-Date` visível, em `evidencias/s
 | Documento | Finalidade |
 | --- | --- |
 | [`RESPOSTAS.md`](RESPOSTAS.md) | respostas às questões do roteiro e justificativas de design |
-| [`ROTEIRO.md`](ROTEIRO.md) | enunciado do Sprint 1 |
+| [`ROTEIRO-SPRINT1.md`](ROTEIRO-SPRINT1.md) | enunciado do Sprint 1 |
+| [`ROTEIRO-SPRINT2.md`](ROTEIRO-SPRINT2.md) | enunciado do Sprint 2 |
 
 ## Autor
 
