@@ -9,6 +9,9 @@ __pycache__/
 venv/
 agencia/data/*.jsonl
 
+# Segredos
+.env
+
 # Ferramentas
 .serena/
 

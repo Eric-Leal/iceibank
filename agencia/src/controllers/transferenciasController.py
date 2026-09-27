@@ -1,9 +1,8 @@
-import requests
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
 import config
-from services import auth
+from services import auth, mensageria
 
 router = APIRouter()
 
@@ -15,12 +14,6 @@ class Transferencia(BaseModel):
     idOperacao: str | None = None
 
 
-class CreditoRemoto(BaseModel):
-    valor: float
-    timestampLamport: int
-    origemAgencia: int
-
-
 def registrar_conclusao(estado, id_operacao, resposta):
     if id_operacao:
         estado.transferencias_aplicadas[id_operacao] = resposta
@@ -28,7 +21,7 @@ def registrar_conclusao(estado, id_operacao, resposta):
 
 
 @router.post("/transferencias")
-def transferir(dados: Transferencia, request: Request, token=Depends(auth.autenticado)):
+async def transferir(dados: Transferencia, request: Request, token=Depends(auth.autenticado)):
     auth.exige_dono(token, dados.idOrigem)
 
     estado = request.app.state
@@ -82,70 +75,46 @@ def transferir(dados: Transferencia, request: Request, token=Depends(auth.autent
             estado, dados.idOperacao, {"mensagem": "Transferencia concluida (mesma agencia)."}
         )
 
-    # Caso entre agencias: chama a agencia de destino diretamente via REST
-    ts_envio = estado.relogio.ao_enviar()
-    url_destino = next(a["url"] for a in config.AGENCIAS if a["id"] == agencia_destino)
-
-    # A chamada entre agencias leva um token de servico proprio, emitido por esta
-    # agencia, em vez de repassar o token do cliente (ver justificativa em RESPOSTAS.md).
-    token_servico = auth.gerar_token(sub=f"agencia-{estado.id_agencia}", tipo="servico", minutos=1)
-
-    try:
-        resposta = requests.post(
-            f"{url_destino}/contas/{dados.idDestino}/creditar-remoto",
-            json={
-                "valor": dados.valor,
-                "timestampLamport": ts_envio,
-                "origemAgencia": estado.id_agencia,
-            },
-            headers={"Authorization": f"Bearer {token_servico}"},
-            timeout=5,
-        )
-        resposta.raise_for_status()
-        return registrar_conclusao(
-            estado, dados.idOperacao, {"mensagem": "Transferencia concluida (entre agencias)."}
-        )
-    except requests.RequestException as erro:
-        # LIMITACAO CONHECIDA: se esta chamada falhar, o debito ja aplicado acima
-        # NAO e revertido - o dinheiro "desaparece" temporariamente. Resolver isso
-        # de forma correta (garantir atomicidade mesmo sob falha) e o assunto do
-        # Sprint 4, com uma transacao distribuida de verdade (2PC/Saga). Por
-        # enquanto, so registramos a inconsistencia no log.
-        estado.registro.registrar(
-            "TRANSFERENCIA_FALHOU",
-            estado.relogio.evento_local(),
-            {
-                "idOrigem": dados.idOrigem,
-                "idDestino": dados.idDestino,
-                "valor": dados.valor,
-                "erro": str(erro),
-            },
-        )
-        raise HTTPException(
-            502,
-            "Falha ao contatar agencia de destino. Debito ja aplicado - inconsistencia conhecida (ver Sprint 4).",
-        )
-
-
-@router.post("/contas/{id_conta}/creditar-remoto")
-def creditar_remoto(
-    id_conta: int, dados: CreditoRemoto, request: Request, token=Depends(auth.exige_servico)
-):
-    estado = request.app.state
-
-    # Ao RECEBER uma mensagem de outra agencia, o relogio de Lamport e
-    # atualizado com base no timestamp recebido - e a regra 3 do algoritmo.
-    ts = estado.relogio.ao_receber(dados.timestampLamport)
-
-    conta = estado.contas.get(id_conta)
-    if not conta:
-        raise HTTPException(404, "Conta nao encontrada nesta agencia.")
-
-    conta["saldo"] += dados.valor
-    estado.registro.registrar(
-        "TRANSFERENCIA_CREDITO_REMOTO",
-        ts,
-        {"idConta": id_conta, "valor": dados.valor, "origemAgencia": dados.origemAgencia},
+    # Em vez de chamar a outra agencia diretamente (Sprint 1), publicamos um
+    # evento na exchange do RabbitMQ. A agencia de destino consome quando
+    # estiver disponivel - mesmo que esteja fora do ar agora, a mensagem fica
+    # retida na fila (durable) e e entregue quando ela voltar.
+    vetor_envio = estado.relogio.ao_enviar()
+    await mensageria.publicar(
+        f"agencia.{agencia_destino}.creditar",
+        {
+            "idConta": dados.idDestino,
+            "valor": dados.valor,
+            "vetorEnvio": vetor_envio,
+            "origemAgencia": estado.id_agencia,
+        },
     )
 
-    return {"mensagem": "Credito remoto aplicado.", "saldoAtual": conta["saldo"]}
+    return registrar_conclusao(
+        estado,
+        dados.idOperacao,
+        {"mensagem": "Transferencia publicada para a agencia de destino (entrega assincrona)."},
+    )
+
+
+def processar_credito_remoto(estado, mensagem):
+    """Consumidor da fila desta agencia: aplica creditos vindos de outras agencias."""
+    # Ao RECEBER uma mensagem de outra agencia, o relogio vetorial e
+    # atualizado com base no vetor recebido - e a regra 3 do algoritmo.
+    vetor = estado.relogio.ao_receber(mensagem["vetorEnvio"])
+
+    detalhes = {
+        "idConta": mensagem["idConta"],
+        "valor": mensagem["valor"],
+        "origemAgencia": mensagem["origemAgencia"],
+    }
+
+    conta = estado.contas.get(mensagem["idConta"])
+    if not conta:
+        estado.registro.registrar(
+            "CREDITO_REMOTO_FALHOU", vetor, {**detalhes, "motivo": "conta nao encontrada"}
+        )
+        return
+
+    conta["saldo"] += mensagem["valor"]
+    estado.registro.registrar("TRANSFERENCIA_CREDITO_REMOTO", vetor, detalhes)

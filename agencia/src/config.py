@@ -1,5 +1,10 @@
 import os
 
+from dotenv import load_dotenv
+
+# Le agencia/.env; variaveis ja definidas no terminal (como AGENCIA_ID) continuam valendo.
+load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".env"))
+
 # OFFSET pessoal (dois ultimos digitos da matricula/RA)
 OFFSET = 81
 

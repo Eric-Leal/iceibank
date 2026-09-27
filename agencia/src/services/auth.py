@@ -46,12 +46,6 @@ def exige_operador(token=Depends(autenticado)):
     return token
 
 
-def exige_servico(token=Depends(autenticado)):
-    if token["tipo"] != "servico":
-        raise HTTPException(403, "Esta rota so aceita chamadas entre agencias.")
-    return token
-
-
 def exige_dono(token, id_conta):
     """Autorizacao: cliente so opera a propria conta; operador opera qualquer uma."""
     if token["tipo"] == "operador":
