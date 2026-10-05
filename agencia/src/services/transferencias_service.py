@@ -29,21 +29,23 @@ class TransferenciasService:
         if not conta_origem:
             raise ContaNaoEncontrada("Conta de origem nao encontrada nesta agencia.")
 
+        agencia_destino = config.agencia_responsavel(id_destino)
+        transferencia_local = agencia_destino == self.id_agencia
+
+        # Na transferencia local o destino e conhecido aqui, entao e validado antes
+        # de mexer no saldo. Entre agencias, so a agencia de destino sabe se a conta existe.
+        conta_destino = self.contas.buscar(id_destino) if transferencia_local else None
+        if transferencia_local and not conta_destino:
+            raise ContaNaoEncontrada("Conta de destino nao encontrada.")
+
         # O debito e sempre local, pois esta agencia e a dona da conta de origem
         conta_origem.debitar(valor)
         ts_debito = self.relogio.evento_local()
         self.contas.salvar(conta_origem)
         self.registro.registrar("TRANSFERENCIA_DEBITO", ts_debito, detalhes)
 
-        agencia_destino = config.agencia_responsavel(id_destino)
-        if agencia_destino == self.id_agencia:
+        if transferencia_local:
             # Caso simples: mesma agencia, credita direto
-            conta_destino = self.contas.buscar(id_destino)
-            if not conta_destino:
-                conta_origem.creditar(valor)
-                self.contas.salvar(conta_origem)
-                raise ContaNaoEncontrada("Conta de destino nao encontrada.")
-
             ts_credito = self.relogio.evento_local()
             conta_destino.creditar(valor)
             self.contas.salvar(conta_destino)
