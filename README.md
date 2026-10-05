@@ -156,7 +156,7 @@ O RabbitMQ roda no **CloudAMQP** (plano gratuito), então não precisa instalar 
 | Routing key | `agencia.<id>.creditar`, cada fila ligada só à sua |
 | Mensagens | persistentes, confirmadas (ack) só depois de processadas |
 
-A conexão usa `connect_robust` do `aio-pika`, que reconecta sozinha se o broker cair. O consumidor sobe junto com a agência e roda em paralelo ao servidor HTTP. O script `testar_mensageria.py` testa o roteamento fora da aplicação: cada fila só recebe a mensagem da própria routing key.
+A conexão usa `connect_robust` do `aio-pika`, que reconecta sozinha se o broker cair. O consumidor sobe junto com a agência e roda em paralelo ao servidor HTTP. O script `scripts/testar_mensageria.py` testa o roteamento fora da aplicação: cada fila só recebe a mensagem da própria routing key.
 
 ## Relógio Vetorial
 
@@ -177,7 +177,7 @@ Todo evento é gravado em `data/eventos-agencia-N.jsonl`, com o vetor e a hora d
 | Origem (Sprint 1) | clique duplo em Transferir debitava duas vezes | o frontend manda um `idOperacao`; repetido, a agência devolve o resultado anterior e loga `TRANSFERENCIA_IGNORADA` |
 | Destino (Sprint 2) | o RabbitMQ pode entregar a mesma mensagem duas vezes (entrega "pelo menos uma vez") | cada mensagem leva um `idMensagem`; repetida, a agência não credita de novo e loga `CREDITO_REMOTO_IGNORADO` |
 
-Os ids aplicados ficam no `TransferenciasRepository`. O script `testar_idempotencia.py` publica a mesma mensagem de crédito duas vezes para demonstrar.
+Os ids aplicados ficam no `TransferenciasRepository`. O script `scripts/testar_idempotencia.py` publica a mesma mensagem de crédito duas vezes para demonstrar.
 
 ## Autenticação e Autorização
 
@@ -253,7 +253,9 @@ iceibank/
 │   ├── sprint1/                # prints do Sprint 1
 │   ├── sprint2/                # prints do Sprint 2
 │   └── videos/                 # videos de apresentacao
-├── RESPOSTAS.md                # respostas das questoes do roteiro
+├── RESPOSTAS.md                # indice das respostas
+├── RESPOSTAS-SPRINT1.md        # respostas do Sprint 1
+├── RESPOSTAS-SPRINT2.md        # respostas do Sprint 2
 ├── ROTEIRO-SPRINT1.md          # enunciado do Sprint 1
 ├── ROTEIRO-SPRINT2.md          # enunciado do Sprint 2
 └── README.md
@@ -267,8 +269,9 @@ agencia/
 ├── pyproject.toml              # configuracao do linter
 ├── .env.example                # modelo do .env com a RABBITMQ_URL
 ├── mesclar_logs.py             # linha do tempo causal e pares concorrentes
-├── testar_mensageria.py        # testa o roteamento das filas fora da aplicacao
-├── testar_idempotencia.py      # entrega a mesma mensagem de credito duas vezes
+├── scripts/                    # verificacoes manuais, precisam do RabbitMQ no ar
+│   ├── testar_mensageria.py    # testa o roteamento das filas fora da aplicacao
+│   └── testar_idempotencia.py  # entrega a mesma mensagem de credito duas vezes
 ├── data/                       # logs .jsonl gerados em execucao (nao versionados)
 └── src/
     ├── main.py                 # monta as camadas e liga o consumidor
@@ -355,7 +358,7 @@ copy .env.example .env
 O `.env` fica fora do Git, porque a URL carrega usuário e senha. Para conferir a conexão e o roteamento das filas:
 
 ```powershell
-.venv\Scripts\python.exe testar_mensageria.py
+.venv\Scripts\python.exe scripts\testar_mensageria.py
 ```
 
 ### 3. Subir as três agências
@@ -441,7 +444,8 @@ Prints de execução real, com a saída de `Get-Date` visível.
 
 | Documento | Finalidade |
 | --- | --- |
-| [`RESPOSTAS.md`](RESPOSTAS.md) | respostas às questões do roteiro e justificativas de design |
+| [`RESPOSTAS-SPRINT1.md`](RESPOSTAS-SPRINT1.md) | respostas e justificativas de design do Sprint 1 |
+| [`RESPOSTAS-SPRINT2.md`](RESPOSTAS-SPRINT2.md) | respostas do Sprint 2 |
 | [`ROTEIRO-SPRINT1.md`](ROTEIRO-SPRINT1.md) | enunciado do Sprint 1 |
 | [`ROTEIRO-SPRINT2.md`](ROTEIRO-SPRINT2.md) | enunciado do Sprint 2 |
 
