@@ -356,3 +356,51 @@ Regressão depois da troca de REST por mensageria: depósito pelo frontend logad
 ![Depósito registrado com vetor na agência 0](evidencias/sprint2/regressao-log-deposito.png)
 
 ![Token expirado recusado no frontend](evidencias/sprint2/regressao-token-expirado.png)
+
+## Parte D (Linha do tempo causal)
+
+1. **No Sprint 1, o relógio de Lamport não permitia essa análise. O que exatamente, no relógio vetorial, torna possível essa comparação confiável?**
+
+   **Resposta:** O vetor guarda quanto cada evento sabia de cada agência, posição por posição. O Lamport junta tudo num número só e perde essa informação: dois números diferentes não dizem se um evento conhecia o outro.
+
+   Com o vetor, a comparação vira uma checagem direta. Se V1 é menor ou igual a V2 em todas as posições, tudo que V1 conhecia V2 também conhecia, então V1 veio antes. Se cada um é maior em alguma posição, cada um viu algo que o outro não viu, e nenhum pode ter causado o outro. É isso que `comparar_vetores()` faz no `mesclar_logs.py`.
+
+   Isso só funciona porque a regra 3 propaga o conhecimento: ao receber uma mensagem, a agência fica com o máximo de cada posição. Então o crédito remoto sempre carrega tudo o que o débito sabia, e nunca sai como concorrente dele.
+
+2. **Encontre, no seu próprio teste, um par de eventos que o script classificou como concorrente. Faz sentido? Explique por que eles realmente não têm relação de causa e efeito entre si.**
+
+   **Resposta:** PENDENTE: preencher com a saída do teste no PC.
+
+3. **O algoritmo de comparação de vetores neste script é O(n²) no número de eventos. Isso seria um problema em um sistema real com milhões de eventos? O que se poderia fazer para tornar essa análise mais escalável?**
+
+   **Resposta:** Seria. Com um milhão de eventos são cerca de 500 bilhões de comparações, cada uma percorrendo o vetor inteiro. Com os poucos eventos do meu teste isso roda na hora, mas não escala.
+
+   Dá para reduzir bastante sem mudar a ideia:
+
+   - Analisar uma janela de tempo em vez do histórico todo, aceitando não olhar pares muito distantes.
+   - Comparar só os eventos que interessam, como os da mesma conta. O script já pula pares da mesma agência, que são sempre causais.
+   - Processar em fluxo: cada evento novo é comparado só com os eventos recentes das outras agências, em vez de reprocessar tudo a cada execução.
+
+   ![Linha do tempo causal com pares concorrentes](evidencias/sprint2/linha-do-tempo-causal.png)
+
+## Funcionalidade adicional (seção 2.1)
+
+**Funcionalidade escolhida: idempotência no consumidor de créditos**
+
+No Sprint 1 tornei a transferência idempotente na origem, para um clique duplo não debitar duas vezes. Com a mensageria apareceu o mesmo problema do outro lado. O RabbitMQ garante entrega "pelo menos uma vez": se a agência de destino processa a mensagem e cai antes de confirmar (o ack), o broker entrega a mesma mensagem de novo. Sem nenhuma proteção, a conta de destino recebia o crédito duas vezes, e o dinheiro aparecia do nada.
+
+Escolhi essa porque fecha um furo real da troca de REST por mensageria, e porque continua a ideia que eu já tinha começado no Sprint 1.
+
+**O que ela faz.** Cada mensagem de crédito passou a levar um `idMensagem`, gerado com `uuid4()` na hora da publicação. A agência de destino guarda os ids que já aplicou no `TransferenciasRepository`. Se chegar uma mensagem com um id repetido, ela não credita de novo e registra o evento `CREDITO_REMOTO_IGNORADO` no log.
+
+O id só é guardado depois que o crédito é aplicado. Se a conta não existir, a mensagem não entra na lista, então uma nova entrega ainda pode ser aplicada se a conta for criada.
+
+Mensagens sem `idMensagem`, como as que ficaram retidas na fila antes desta mudança, continuam sendo aplicadas normalmente.
+
+**Teste.** Criei o script `agencia/testar_idempotencia.py`, que simula a falha do ack publicando a mesma mensagem de crédito duas vezes na fila da agência dona da conta.
+
+PENDENTE: preencher com o resultado do teste no PC.
+
+![Mesma mensagem de crédito entregue duas vezes, aplicada uma vez só](evidencias/sprint2/funcionalidade-adicional.png)
+
+**Limite conhecido.** Igual ao Sprint 1, os ids ficam em memória e somem se a agência reiniciar.
