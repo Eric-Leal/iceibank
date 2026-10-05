@@ -6,7 +6,7 @@
 
 <div align="center">
 
-Banco simplificado dividido em agências independentes, com API REST em arquitetura MVC, relógio lógico de Lamport e autenticação JWT.
+Banco simplificado dividido em agências independentes, com API REST em arquitetura MVC, comunicação entre agências por mensageria (RabbitMQ), relógio vetorial e autenticação JWT.
 
 <p>
   <img alt="Python 3.12" src="https://img.shields.io/badge/Python-3.12-3776AB?style=for-the-badge&logo=python&logoColor=white" />
@@ -14,6 +14,7 @@ Banco simplificado dividido em agências independentes, com API REST em arquitet
   <img alt="Uvicorn" src="https://img.shields.io/badge/Uvicorn-0.52-499848?style=for-the-badge&logo=gunicorn&logoColor=white" />
   <img alt="PyJWT" src="https://img.shields.io/badge/PyJWT-2.13-000000?style=for-the-badge&logo=jsonwebtokens&logoColor=white" />
   <img alt="Pydantic" src="https://img.shields.io/badge/Pydantic-2-E92063?style=for-the-badge&logo=pydantic&logoColor=white" />
+  <img alt="RabbitMQ" src="https://img.shields.io/badge/RabbitMQ-CloudAMQP-FF6600?style=for-the-badge&logo=rabbitmq&logoColor=white" />
 </p>
 
 </div>
@@ -27,7 +28,9 @@ Banco simplificado dividido em agências independentes, com API REST em arquitet
 - [Visão Geral](#visão-geral)
 - [Escolha de Linguagem](#escolha-de-linguagem)
 - [Arquitetura](#arquitetura)
-- [Relógio de Lamport](#relógio-de-lamport)
+- [Mensageria (RabbitMQ)](#mensageria-rabbitmq)
+- [Relógio Vetorial](#relógio-vetorial)
+- [Idempotência](#idempotência)
 - [Autenticação e Autorização](#autenticação-e-autorização)
 - [Endpoints](#endpoints)
 - [Limitação Conhecida](#limitação-conhecida)
@@ -40,17 +43,17 @@ Banco simplificado dividido em agências independentes, com API REST em arquitet
 
 ## Uso de IA
 
-- **Claude (Anthropic)**: usado para preparar o ambiente (estruturação de pastas, configuração do projeto FastAPI), traduzir para Python o código de referência que o roteiro fornece em Node.js/Express, verificar e corrigir o código implementado, ajudar na construção e no ajuste do frontend em Vue, implementar a funcionalidade adicional de idempotência das transferências, complementar/ajudar na formulação das respostas de [`RESPOSTAS.md`](RESPOSTAS.md) e ajudar a organizar e criar os commits do Git.
-- **Pesquisa no Google (Gemini)**: usada para consultar conceitos de sistemas distribuídos (relógio de Lamport, atomicidade em transações distribuídas) e o funcionamento de JWT, abordados nas perguntas do roteiro.
+- **Claude (Anthropic)**: usado para preparar o ambiente (estruturação de pastas, configuração do projeto FastAPI), traduzir para Python o código de referência que o roteiro fornece em Node.js/Express, verificar e corrigir o código implementado, ajudar na construção e no ajuste do frontend em Vue, implementar as funcionalidades adicionais de idempotência (transferências no Sprint 1, consumidor de créditos no Sprint 2), separar o backend em camadas (controllers, services, repositories e models), complementar/ajudar na formulação das respostas de [`RESPOSTAS.md`](RESPOSTAS.md) e ajudar a organizar e criar os commits do Git.
+- **Pesquisa no Google (Gemini)**: usada para consultar conceitos de sistemas distribuídos (relógios lógico e vetorial, mensageria, atomicidade em transações distribuídas) e o funcionamento de JWT, abordados nas perguntas do roteiro.
 
 ## Contexto Acadêmico
 
-Este projeto corresponde ao **Sprint 1** de um projeto único que evolui ao longo de quatro sprints, cada um alinhado a uma unidade da ementa e a um conceito de Sistemas Distribuídos:
+Este projeto corresponde ao **Sprint 2** de um projeto único que evolui ao longo de quatro sprints, cada um alinhado a uma unidade da ementa e a um conceito de Sistemas Distribuídos:
 
 | Sprint | Unidade | Tecnologia | Conceito de Sistemas Distribuídos |
 | --- | --- | --- | --- |
-| **1 (atual)** | U2 - Desenvolvimento Web | API REST / MVC | Relógio lógico de Lamport |
-| 2 | U3 - Comunicação indireta | Mensageria / Pub-Sub | Relógio vetorial |
+| 1 | U2 - Desenvolvimento Web | API REST / MVC | Relógio lógico de Lamport |
+| **2 (atual)** | U3 - Comunicação indireta | Mensageria / Pub-Sub | Relógio vetorial |
 | 3 | U4 - Desenvolvimento Móvel | App Flutter | Consenso (eleição de líder) |
 | 4 | U5 - Computação em Nuvem | Containers | Transações distribuídas (2PC/Saga) |
 
@@ -58,15 +61,26 @@ Este projeto corresponde ao **Sprint 1** de um projeto único que evolui ao long
 
 O ICEIBank simula um banco dividido em agências, onde cada agência é uma **partição independente** de contas, não uma réplica. O mesmo código é executado três vezes com identidades diferentes, e cada instância responde apenas pelas contas sob sua responsabilidade.
 
-Funcionalidades do Sprint 1:
+Funcionalidades:
 
 - CRUD de contas com depósito e saque
 - Particionamento determinístico de contas entre as três agências
-- Transferência dentro da mesma agência (local) e entre agências diferentes (via REST)
-- Registro de todos os eventos com timestamp de relógio lógico de Lamport
-- Linha do tempo unificada, mesclando os logs das três agências
+- Transferência dentro da mesma agência (local) e entre agências diferentes (via RabbitMQ, assíncrona)
+- Registro de todos os eventos com timestamp de relógio vetorial
+- Linha do tempo causal, que mescla os logs das três agências e aponta os pares de eventos concorrentes
 - Autenticação e autorização via JWT
 - Interface web consumindo a API autenticada, com escolha da agência de acesso
+- Idempotência na origem (transferência reenviada) e no destino (mensagem de crédito entregue duas vezes)
+
+O que mudou do Sprint 1 para o Sprint 2:
+
+| Sprint 1 | Sprint 2 |
+| --- | --- |
+| Relógio de Lamport (um contador) | Relógio vetorial (um contador por agência) |
+| Chamada REST direta para `creditar-remoto` | Publicação na exchange do RabbitMQ, consumida pela agência de destino |
+| Destino fora do ar: 502 e crédito perdido | Destino fora do ar: mensagem retida na fila e entregue quando ele volta |
+| Token de serviço para a rota interna | Rota interna removida; o acesso ao broker é controlado pela credencial do CloudAMQP |
+| Linha do tempo ordenada por Lamport | Linha do tempo por hora de parede, com pares concorrentes identificados pelo vetor |
 
 ## Escolha de Linguagem
 
@@ -96,25 +110,30 @@ Cliente
    v
 Agencia de origem (dona da conta de origem)
    |
-   |-- destino na mesma agencia  -> credita direto na memoria
+   |-- destino na mesma agencia  -> credita direto
    |
-   \-- destino em outra agencia  -> POST /contas/{id}/creditar-remoto
-                                    (token de servico + timestamp de Lamport)
+   \-- destino em outra agencia  -> publica em iceibank.eventos
+                                    routing key agencia.<destino>.creditar
+                                    (vetor de envio + idMensagem)
                                           |
                                           v
-                                    Agencia de destino
+                                    fila-agencia-<destino> (duravel)
+                                          |
+                                          v
+                                    Agencia de destino consome e credita
 ```
 
 ### Camadas do backend
 
 | Camada | Responsabilidade | Arquivos |
 | --- | --- | --- |
-| Configuração | Particionamento, portas e parâmetros de JWT | `config.py` |
-| Controllers | Rotas HTTP e validação de entrada | `controllers/` |
-| Services | Relógio lógico, registro de eventos e autenticação | `services/` |
-| Aplicação | Composição do estado e registro dos routers | `main.py` |
+| Controllers | Só HTTP: rotas, validação de entrada, JWT e tradução de erro para status | `controllers/` |
+| Services | Regras de negócio: partição, saldo, idempotência, relógio, log e mensageria | `services/` |
+| Repositories | Só acesso a dados (buscar, salvar), sem regra de negócio | `repositories/` |
+| Models | A entidade `Conta`, com `creditar()` e `debitar()` | `models/` |
+| Composição | Monta repositories, services e controllers e liga o consumidor do RabbitMQ | `main.py` |
 
-O estado de cada agência (contas, relógio e registro de eventos) vive em `app.state`, criado no boot. As contas ficam em memória, sem banco de dados, conforme o escopo do sprint.
+Os services não conhecem FastAPI: levantam erros de negócio (`SaldoInsuficiente`, `ContaNaoEncontrada`...) e `controllers/erros.py` traduz cada um para 400, 401, 404 ou 409. A rota HTTP e o consumidor do RabbitMQ usam o mesmo `TransferenciasService`. As contas ficam em memória, dentro do `ContasRepository`; trocar por um banco mexe só nessa camada.
 
 ### Camadas do frontend
 
@@ -126,32 +145,53 @@ O estado de cada agência (contas, relógio e registro de eventos) vive em `app.
 
 O token é injetado em toda requisição por um interceptor do axios, e um segundo interceptor derruba a sessão e leva a pessoa de volta ao login quando a API responde 401.
 
-## Relógio de Lamport
+## Mensageria (RabbitMQ)
 
-Cada agência mantém um contador inteiro próprio, seguindo as três regras do algoritmo:
+O RabbitMQ roda no **CloudAMQP** (plano gratuito), então não precisa instalar nada localmente.
+
+| Elemento | Valor |
+| --- | --- |
+| Exchange | `iceibank.eventos`, tipo `topic`, durável |
+| Filas | `fila-agencia-0`, `fila-agencia-1`, `fila-agencia-2`, duráveis |
+| Routing key | `agencia.<id>.creditar`, cada fila ligada só à sua |
+| Mensagens | persistentes, confirmadas (ack) só depois de processadas |
+
+A conexão usa `connect_robust` do `aio-pika`, que reconecta sozinha se o broker cair. O consumidor sobe junto com a agência e roda em paralelo ao servidor HTTP. O script `testar_mensageria.py` testa o roteamento fora da aplicação: cada fila só recebe a mensagem da própria routing key.
+
+## Relógio Vetorial
+
+Cada agência mantém um vetor com um contador por agência (`[ag0, ag1, ag2]`), seguindo as três regras do algoritmo:
 
 | Regra | Método | Comportamento |
 | --- | --- | --- |
-| Evento local | `evento_local()` | incrementa o contador |
-| Ao enviar | `ao_enviar()` | incrementa e envia o valor junto da mensagem |
-| Ao receber | `ao_receber(ts)` | ajusta para `max(local, recebido) + 1` |
+| Evento local | `evento_local()` | incrementa a própria posição |
+| Ao enviar | `ao_enviar()` | incrementa a própria posição e envia o vetor junto da mensagem |
+| Ao receber | `ao_receber(v)` | fica com o máximo de cada posição e incrementa a própria |
 
-Todo evento é gravado em `data/eventos-agencia-N.jsonl`, com o timestamp lógico e a hora de parede. O script `mesclar_logs.py` junta os arquivos das três agências em uma única linha do tempo ordenada por Lamport, o que permite observar empates entre eventos concorrentes e a divergência em relação ao tempo real.
+Todo evento é gravado em `data/eventos-agencia-N.jsonl`, com o vetor e a hora de parede. O script `mesclar_logs.py` junta os arquivos das três agências, ordena por hora de parede e compara os vetores de agências diferentes: se nenhum é menor ou igual ao outro em todas as posições, o par é listado como **concorrente**. O débito e o crédito de uma mesma transferência nunca aparecem como concorrentes, porque a regra 3 propaga o vetor do débito para o crédito.
+
+## Idempotência
+
+| Onde | Problema | Solução |
+| --- | --- | --- |
+| Origem (Sprint 1) | clique duplo em Transferir debitava duas vezes | o frontend manda um `idOperacao`; repetido, a agência devolve o resultado anterior e loga `TRANSFERENCIA_IGNORADA` |
+| Destino (Sprint 2) | o RabbitMQ pode entregar a mesma mensagem duas vezes (entrega "pelo menos uma vez") | cada mensagem leva um `idMensagem`; repetida, a agência não credita de novo e loga `CREDITO_REMOTO_IGNORADO` |
+
+Os ids aplicados ficam no `TransferenciasRepository`. O script `testar_idempotencia.py` publica a mesma mensagem de crédito duas vezes para demonstrar.
 
 ## Autenticação e Autorização
 
-O sistema trabalha com três tipos de token, todos assinados com a mesma chave (`HS256`):
+O sistema trabalha com dois tipos de token, assinados com a mesma chave (`HS256`):
 
 | Tipo | Origem | Permissões |
 | --- | --- | --- |
 | `operador` | `POST /auth/login-operador` | criar contas e operar qualquer conta da agência |
 | `cliente` | `POST /auth/login` | operar exclusivamente a própria conta |
-| `servico` | gerado internamente pela agência de origem | apenas a rota `creditar-remoto`, validade de 1 minuto |
 
 - **Autenticação** (`autenticado`): valida assinatura e expiração. Falha retorna **401**.
-- **Autorização** (`exige_dono`): compara o `sub` do token com a conta alvo. Falha retorna **403**.
+- **Autorização** (`exige_dono`, `exige_operador`): compara o token com a conta alvo ou com o perfil exigido. Falha retorna **403**.
 
-Senhas são armazenadas com `sha256` e nunca retornam nas respostas da API. A chave secreta é lida da variável de ambiente `JWT_SEGREDO`.
+O consumidor do RabbitMQ não passa por JWT: quem consegue publicar na exchange é quem tem a URL do CloudAMQP, que fica no `agencia/.env` (fora do Git). Senhas são armazenadas com `sha256` e nunca retornam nas respostas da API. A chave do JWT é lida da variável de ambiente `JWT_SEGREDO`.
 
 ## Endpoints
 
@@ -164,15 +204,16 @@ Senhas são armazenadas com `sha256` e nunca retornam nas respostas da API. A ch
 | `POST` | `/contas/{id}/depositar` | dono ou operador | deposita valor |
 | `POST` | `/contas/{id}/sacar` | dono ou operador | saca valor |
 | `POST` | `/transferencias` | dono da origem | transfere, local ou entre agências |
-| `POST` | `/contas/{id}/creditar-remoto` | token de serviço | recebe crédito de outra agência |
+
+O crédito entre agências não é mais uma rota HTTP: chega pela fila da agência de destino.
 
 Documentação interativa gerada automaticamente pelo FastAPI em `http://localhost:8081/docs`.
 
 ## Limitação Conhecida
 
-Se a transferência entre agências falhar depois do débito (agência de destino fora do ar, rede indisponível), o débito **não é revertido**. O valor sai da conta de origem e não chega à de destino, e o sistema apenas registra o evento `TRANSFERENCIA_FALHOU` no log.
+A mensageria garante que o crédito **chega**, mas não que ele **dá certo**. Se a conta de destino não existir quando a mensagem for consumida (por exemplo, a agência reiniciou e perdeu as contas em memória), a agência de destino só registra `CREDITO_REMOTO_FALHOU`. O débito na origem não é revertido, e a origem nem fica sabendo, porque a resposta da transferência só confirma que a mensagem foi publicada.
 
-Isso é intencional neste sprint: é exatamente o problema que o Sprint 4 resolve com transações distribuídas (2PC ou Saga). A evidência da falha está em `evidencias/sprint1/falha-conhecida.png`.
+Isso é intencional nesta etapa: garantir que débito e crédito aconteçam juntos ou nenhum dos dois é o assunto do Sprint 4 (transações distribuídas com 2PC ou Saga). A evidência está em `evidencias/sprint2/resiliencia-fila.png`.
 
 ## Tecnologias Utilizadas
 
@@ -183,7 +224,9 @@ Isso é intencional neste sprint: é exatamente o problema que o Sprint 4 resolv
 - Uvicorn `0.52`
 - Pydantic (validação de entrada)
 - PyJWT `2.13` (autenticação)
-- requests `2.34` (chamadas entre agências)
+- aio-pika (cliente assíncrono do RabbitMQ)
+- python-dotenv (leitura do `agencia/.env`)
+- RabbitMQ gerenciado pelo CloudAMQP
 
 ### Frontend
 
@@ -222,19 +265,34 @@ iceibank/
 agencia/
 ├── requirements.txt
 ├── pyproject.toml              # configuracao do linter
-├── mesclar_logs.py             # linha do tempo unificada das 3 agencias
+├── .env.example                # modelo do .env com a RABBITMQ_URL
+├── mesclar_logs.py             # linha do tempo causal e pares concorrentes
+├── testar_mensageria.py        # testa o roteamento das filas fora da aplicacao
+├── testar_idempotencia.py      # entrega a mesma mensagem de credito duas vezes
 ├── data/                       # logs .jsonl gerados em execucao (nao versionados)
 └── src/
-    ├── main.py                 # composicao da app e estado da agencia
+    ├── main.py                 # monta as camadas e liga o consumidor
     ├── config.py               # particionamento, portas e parametros de JWT
-    ├── controllers/
-    │   ├── authController.py           # rotas de login
-    │   ├── contasController.py         # CRUD, deposito e saque
-    │   └── transferenciasController.py # transferencias e credito remoto
-    └── services/
-        ├── relogio_lamport.py  # as tres regras do algoritmo
-        ├── registro_eventos.py # gravacao dos eventos em .jsonl
-        └── auth.py             # geracao e validacao de tokens
+    ├── controllers/            # so HTTP
+    │   ├── authController.py
+    │   ├── contasController.py
+    │   ├── transferenciasController.py
+    │   ├── dependencias.py     # JWT, autorizacao e acesso aos services
+    │   └── erros.py            # erro de negocio -> status HTTP
+    ├── services/               # regras de negocio
+    │   ├── auth.py             # senha, token e login
+    │   ├── contas_service.py
+    │   ├── transferencias_service.py
+    │   ├── erros.py            # erros de negocio
+    │   ├── relogio_vetorial.py # as tres regras do algoritmo
+    │   ├── relogio_lamport.py  # relogio do Sprint 1, mantido como historico
+    │   ├── registro_eventos.py # gravacao dos eventos em .jsonl
+    │   └── mensageria.py       # publicar e assinar no RabbitMQ
+    ├── repositories/           # so dados
+    │   ├── contas_repository.py
+    │   └── transferencias_repository.py
+    └── models/
+        └── conta.py
 ```
 
 ### Frontend
@@ -266,6 +324,7 @@ frontend/
 - Python 3.12 ou superior
 - Node.js 22.18 ou superior (para o frontend)
 - Git
+- Uma instância gratuita do RabbitMQ no [CloudAMQP](https://www.cloudamqp.com/)
 
 ### 1. Preparar o ambiente
 
@@ -284,9 +343,24 @@ cd frontend
 npm install
 ```
 
-### 2. Subir as três agências
+### 2. Configurar o RabbitMQ
 
-Cada agência é o mesmo código, identificado pela variável `AGENCIA_ID`. Em três terminais:
+Copie o modelo e preencha a `RABBITMQ_URL` com a URL AMQP da sua instância do CloudAMQP:
+
+```powershell
+cd agencia
+copy .env.example .env
+```
+
+O `.env` fica fora do Git, porque a URL carrega usuário e senha. Para conferir a conexão e o roteamento das filas:
+
+```powershell
+.venv\Scripts\python.exe testar_mensageria.py
+```
+
+### 3. Subir as três agências
+
+Cada agência é o mesmo código, identificado pela variável `AGENCIA_ID`. Em três terminais, dentro de `agencia/`:
 
 ```powershell
 $env:AGENCIA_ID=0; .venv\Scripts\python.exe src\main.py
@@ -294,7 +368,7 @@ $env:AGENCIA_ID=1; .venv\Scripts\python.exe src\main.py
 $env:AGENCIA_ID=2; .venv\Scripts\python.exe src\main.py
 ```
 
-### 3. Abrir a interface web
+### 4. Abrir a interface web
 
 Em um quarto terminal:
 
@@ -305,7 +379,7 @@ npm run dev
 
 A interface fica em `http://localhost:5173`, que é a única origem liberada no CORS das agências (`ORIGENS_FRONTEND` em `config.py`). O login de operador é `operador` / `iceibank123`; o de cliente é o número da conta e a senha definida na criação. O seletor na tela de login escolhe por qual das três agências o acesso entra.
 
-### 4. Autenticar e operar pela API
+### 5. Autenticar e operar pela API
 
 Alternativa à interface, em um quinto terminal:
 
@@ -317,7 +391,9 @@ Invoke-RestMethod -Uri "http://localhost:8081/contas" -Method Post -Headers $h -
 Invoke-RestMethod -Uri "http://localhost:8081/contas/0" -Headers $h
 ```
 
-### 5. Ver a linha do tempo unificada
+### 6. Ver a linha do tempo causal
+
+Dentro de `agencia/`:
 
 ```powershell
 .venv\Scripts\python.exe mesclar_logs.py
@@ -325,7 +401,23 @@ Invoke-RestMethod -Uri "http://localhost:8081/contas/0" -Headers $h
 
 ## Evidências de Teste
 
-Prints de execução real, com a saída de `Get-Date` visível, em `evidencias/sprint1/`:
+Prints de execução real, com a saída de `Get-Date` visível.
+
+### Sprint 2 (`evidencias/sprint2/`)
+
+| Arquivo | O que comprova |
+| --- | --- |
+| `transferencia-assincrona.png` | transferência entre agências completando pela mensageria, com o log das duas agências |
+| `resiliencia-fila-agencia-fora.png` | agência de destino fora do ar e transferência publicada mesmo assim |
+| `resiliencia-fila-retida.png` | mensagem retida na fila enquanto ninguém consumia |
+| `resiliencia-fila.png` | agência de volta consumindo a mensagem, sem a conta para creditar |
+| `regressao-frontend-deposito.png` | depósito pelo frontend depois da troca para mensageria |
+| `regressao-log-deposito.png` | o mesmo depósito no log, já com vetor |
+| `regressao-token-expirado.png` | token expirado ainda recusado |
+| `linha-do-tempo-causal.png` | linha do tempo das três agências com os pares concorrentes |
+| `funcionalidade-adicional.png` | mesma mensagem de crédito entregue duas vezes e aplicada uma vez só |
+
+### Sprint 1 (`evidencias/sprint1/`)
 
 | Arquivo | O que comprova |
 | --- | --- |
