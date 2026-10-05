@@ -1,6 +1,6 @@
 """Simula o RabbitMQ entregando a mesma mensagem de credito duas vezes.
 
-Uso (com as agencias no ar): python testar_idempotencia.py <conta destino> <valor>
+Uso (com as agencias no ar, de dentro de agencia/): python scripts/testar_idempotencia.py <conta destino> <valor>
 A agencia dona da conta deve creditar uma vez e registrar CREDITO_REMOTO_IGNORADO na segunda.
 """
 
@@ -9,7 +9,7 @@ import os
 import sys
 import uuid
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "src"))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src"))
 
 import config  # noqa: E402
 from services import mensageria  # noqa: E402
