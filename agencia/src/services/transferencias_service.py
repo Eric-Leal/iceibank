@@ -1,3 +1,5 @@
+import uuid
+
 import config
 from services.erros import ContaNaoEncontrada
 
@@ -60,6 +62,8 @@ class TransferenciasService:
         await self.mensageria.publicar(
             f"agencia.{agencia_destino}.creditar",
             {
+                # Identifica a mensagem: se o RabbitMQ entregar de novo, o destino reconhece
+                "idMensagem": str(uuid.uuid4()),
                 "idConta": id_destino,
                 "valor": valor,
                 "vetorEnvio": vetor_envio,
@@ -82,6 +86,15 @@ class TransferenciasService:
             "origemAgencia": mensagem["origemAgencia"],
         }
 
+        # Idempotencia: o RabbitMQ garante entrega "pelo menos uma vez", entao a mesma
+        # mensagem pode chegar repetida (ex.: o ack se perdeu). Credito repetido e ignorado.
+        id_mensagem = mensagem.get("idMensagem")
+        if id_mensagem and self.transferencias.credito_ja_recebido(id_mensagem):
+            self.registro.registrar(
+                "CREDITO_REMOTO_IGNORADO", vetor, {"idMensagem": id_mensagem, **detalhes}
+            )
+            return
+
         conta = self.contas.buscar(mensagem["idConta"])
         if not conta:
             self.registro.registrar(
@@ -91,6 +104,8 @@ class TransferenciasService:
 
         conta.creditar(mensagem["valor"])
         self.contas.salvar(conta)
+        if id_mensagem:
+            self.transferencias.registrar_credito_recebido(id_mensagem)
         self.registro.registrar("TRANSFERENCIA_CREDITO_REMOTO", vetor, detalhes)
 
     def _concluir(self, id_operacao, mensagem):
