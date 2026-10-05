@@ -2,12 +2,9 @@ import hashlib
 from datetime import datetime, timedelta, timezone
 
 import jwt
-from fastapi import Depends, HTTPException
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 import config
-
-esquema_bearer = HTTPBearer(auto_error=False)
+from services.erros import CredenciaisInvalidas, TokenInvalido
 
 
 def hash_senha(senha):
@@ -23,32 +20,33 @@ def gerar_token(sub, tipo, minutos=None):
     return jwt.encode(payload, config.JWT_SEGREDO, algorithm=config.JWT_ALGORITMO)
 
 
-def autenticado(
-    credenciais: HTTPAuthorizationCredentials = Depends(esquema_bearer),
-):
-    if credenciais is None:
-        raise HTTPException(401, "Token ausente.")
+def decodificar_token(token):
     try:
-        return jwt.decode(
-            credenciais.credentials,
-            config.JWT_SEGREDO,
-            algorithms=[config.JWT_ALGORITMO],
-        )
+        return jwt.decode(token, config.JWT_SEGREDO, algorithms=[config.JWT_ALGORITMO])
     except jwt.ExpiredSignatureError:
-        raise HTTPException(401, "Token expirado.")
+        raise TokenInvalido("Token expirado.")
     except jwt.InvalidTokenError:
-        raise HTTPException(401, "Token invalido.")
+        raise TokenInvalido("Token invalido.")
 
 
-def exige_operador(token=Depends(autenticado)):
-    if token["tipo"] != "operador":
-        raise HTTPException(403, "Apenas o operador da agencia pode executar esta operacao.")
-    return token
+class AuthService:
+    def __init__(self, contas):
+        self.contas = contas
 
+    def login_cliente(self, id_conta, senha):
+        conta = self.contas.buscar(id_conta)
+        if not conta or conta.senha_hash != hash_senha(senha):
+            raise CredenciaisInvalidas("Credenciais invalidas.")
+        return self._sessao(sub=id_conta, tipo="cliente")
 
-def exige_dono(token, id_conta):
-    """Autorizacao: cliente so opera a propria conta; operador opera qualquer uma."""
-    if token["tipo"] == "operador":
-        return
-    if token["tipo"] != "cliente" or int(token["sub"]) != id_conta:
-        raise HTTPException(403, "Voce so pode operar a sua propria conta.")
+    def login_operador(self, usuario, senha):
+        if usuario != config.OPERADOR_USUARIO or senha != config.OPERADOR_SENHA:
+            raise CredenciaisInvalidas("Credenciais invalidas.")
+        return self._sessao(sub=usuario, tipo="operador")
+
+    def _sessao(self, sub, tipo):
+        return {
+            "token": gerar_token(sub=sub, tipo=tipo),
+            "tipo": tipo,
+            "expiraEmMinutos": config.JWT_EXPIRACAO_MINUTOS,
+        }
