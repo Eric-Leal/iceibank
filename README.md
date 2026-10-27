@@ -258,6 +258,7 @@ iceibank/
 ├── RESPOSTAS-SPRINT2.md        # respostas do Sprint 2
 ├── ROTEIRO-SPRINT1.md          # enunciado do Sprint 1
 ├── ROTEIRO-SPRINT2.md          # enunciado do Sprint 2
+├── ROTEIRO-SPRINT3.md          # enunciado do Sprint 3
 └── README.md
 ```
 
@@ -448,6 +449,7 @@ Prints de execução real, com a saída de `Get-Date` visível.
 | [`RESPOSTAS-SPRINT2.md`](RESPOSTAS-SPRINT2.md) | respostas do Sprint 2 |
 | [`ROTEIRO-SPRINT1.md`](ROTEIRO-SPRINT1.md) | enunciado do Sprint 1 |
 | [`ROTEIRO-SPRINT2.md`](ROTEIRO-SPRINT2.md) | enunciado do Sprint 2 |
+| [`ROTEIRO-SPRINT3.md`](ROTEIRO-SPRINT3.md) | enunciado do Sprint 3 |
 
 ## Autor
 
