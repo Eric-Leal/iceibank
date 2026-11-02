@@ -40,77 +40,67 @@ async function entrar() {
 </script>
 
 <template>
-  <div class="mx-auto max-w-md">
-    <h2 class="mb-6 text-2xl font-semibold text-slate-800">Entrar</h2>
-
-    <form @submit.prevent="entrar" class="space-y-4 rounded-xl border border-slate-200 bg-white p-6">
-      <SeletorAgencia />
-
-      <div class="flex gap-2">
-        <button
-          type="button"
-          @click="perfil = 'cliente'"
-          :class="[
-            'flex-1 rounded-lg border px-3 py-2 text-sm font-medium',
-            perfil === 'cliente'
-              ? 'border-sky-600 bg-sky-600 text-white'
-              : 'border-slate-300 text-slate-600',
-          ]"
-        >
-          Cliente
-        </button>
-        <button
-          type="button"
-          @click="perfil = 'operador'"
-          :class="[
-            'flex-1 rounded-lg border px-3 py-2 text-sm font-medium',
-            perfil === 'operador'
-              ? 'border-sky-600 bg-sky-600 text-white'
-              : 'border-slate-300 text-slate-600',
-          ]"
-        >
-          Operador
-        </button>
+  <div class="grid min-h-screen lg:grid-cols-2">
+    <div class="hidden flex-col justify-between bg-marca-600 p-12 text-white lg:flex">
+      <div class="flex items-center gap-2">
+        <div class="grid size-10 place-items-center rounded-xl bg-white font-bold text-marca-600">IB</div>
+        <span class="text-lg font-semibold">ICEIBank</span>
       </div>
+      <p class="max-w-md text-lg text-marca-100">
+        Saldo, depósito, saque e transferência entre as 3 agências.
+      </p>
+      <p class="text-sm text-marca-200">PUC Minas · Sprint 3</p>
+    </div>
 
-      <label v-if="perfil === 'cliente'" class="block">
-        <span class="mb-1 block text-sm font-medium text-slate-700">Numero da conta</span>
-        <input
-          v-model.number="idConta"
-          type="number"
-          required
-          class="w-full rounded-lg border border-slate-300 px-3 py-2 focus:border-sky-500 focus:outline-none"
-        />
-      </label>
+    <div class="flex items-center justify-center px-6 py-12">
+      <form @submit.prevent="entrar" class="w-full max-w-sm space-y-5">
+        <div>
+          <h2 class="text-2xl font-semibold">Entrar</h2>
+          <p class="mt-1 text-sm text-slate-500">Escolha a agência e informe seus dados.</p>
+        </div>
 
-      <label v-else class="block">
-        <span class="mb-1 block text-sm font-medium text-slate-700">Usuario</span>
-        <input
-          v-model="usuario"
-          required
-          class="w-full rounded-lg border border-slate-300 px-3 py-2 focus:border-sky-500 focus:outline-none"
-        />
-      </label>
+        <div class="flex rounded-lg bg-slate-100 p-1">
+          <button
+            v-for="opcao in ['cliente', 'operador'] as const"
+            :key="opcao"
+            type="button"
+            @click="perfil = opcao"
+            :class="[
+              'flex-1 rounded-md py-2 text-sm font-medium capitalize',
+              perfil === opcao ? 'bg-white text-marca-700 shadow-sm' : 'text-slate-500',
+            ]"
+          >
+            {{ opcao }}
+          </button>
+        </div>
 
-      <label class="block">
-        <span class="mb-1 block text-sm font-medium text-slate-700">Senha</span>
-        <input
-          v-model="senha"
-          type="password"
-          required
-          class="w-full rounded-lg border border-slate-300 px-3 py-2 focus:border-sky-500 focus:outline-none"
-        />
-      </label>
+        <SeletorAgencia />
 
-      <AlertaMensagem :erro="erro" />
+        <label v-if="perfil === 'cliente'" class="block">
+          <span class="mb-1 block text-sm font-medium">Número da conta</span>
+          <input v-model.number="idConta" type="number" required class="campo" />
+        </label>
 
-      <button
-        type="submit"
-        :disabled="carregando"
-        class="w-full rounded-lg bg-sky-600 px-4 py-2 font-medium text-white hover:bg-sky-700 disabled:opacity-50"
-      >
-        {{ carregando ? 'Entrando...' : 'Entrar' }}
-      </button>
-    </form>
+        <label v-else class="block">
+          <span class="mb-1 block text-sm font-medium">Usuário</span>
+          <input v-model="usuario" required class="campo" />
+        </label>
+
+        <label class="block">
+          <span class="mb-1 block text-sm font-medium">Senha</span>
+          <input v-model="senha" type="password" required class="campo" />
+        </label>
+
+        <AlertaMensagem :erro="erro" />
+
+        <button
+          type="submit"
+          :disabled="carregando"
+          class="w-full rounded-lg bg-marca-600 px-4 py-2.5 font-semibold text-white hover:bg-marca-700 disabled:opacity-50"
+        >
+          {{ carregando ? 'Entrando...' : 'Entrar' }}
+        </button>
+      </form>
+    </div>
   </div>
 </template>

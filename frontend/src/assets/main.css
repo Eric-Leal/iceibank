@@ -1,1 +1,21 @@
 @import 'tailwindcss';
+
+@theme {
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+
+  --color-marca-50: #ecfdf3;
+  --color-marca-100: #d1fae1;
+  --color-marca-200: #a6f2c6;
+  --color-marca-500: #12b76a;
+  --color-marca-600: #039855;
+  --color-marca-700: #027a48;
+  --color-marca-900: #054f31;
+}
+
+body {
+  @apply bg-white text-slate-800 antialiased;
+}
+
+@utility campo {
+  @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2 focus:border-marca-500 focus:ring-2 focus:ring-marca-100 focus:outline-none disabled:bg-slate-100 disabled:text-slate-500;
+}

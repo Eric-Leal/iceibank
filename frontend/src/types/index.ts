@@ -14,6 +14,18 @@ export interface RespostaTransferencia {
   mensagem: string
 }
 
+export interface RespostaLider {
+  idAgencia: number
+  liderAtual: number | null
+}
+
+export interface Atividade {
+  descricao: string
+  detalhe: string
+  valor: number
+  quando: Date
+}
+
 /** Porta da Agencia 0. As demais seguem em sequencia (8081, 8082, 8083). */
 const PORTA_BASE = 8081
 const NUMERO_AGENCIAS = 3

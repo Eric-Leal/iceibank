@@ -2,7 +2,13 @@ import axios from 'axios'
 
 import router from '@/router'
 import { useAuthStore } from '@/stores/auth'
-import { urlAgencia, type Conta, type RespostaLogin, type RespostaTransferencia } from '@/types'
+import {
+  urlAgencia,
+  type Conta,
+  type RespostaLider,
+  type RespostaLogin,
+  type RespostaTransferencia,
+} from '@/types'
 
 const api = axios.create()
 
@@ -75,6 +81,14 @@ export async function depositar(id: number, valor: number) {
 
 export async function sacar(id: number, valor: number) {
   const { data } = await api.post<Conta>(`/contas/${id}/sacar`, { valor })
+  return data
+}
+
+// Sem o interceptor: a rota e publica e cada agencia e consultada direto, com timeout curto.
+export async function consultarLider(idAgencia: number) {
+  const { data } = await axios.get<RespostaLider>(`${urlAgencia(idAgencia)}/bully/lider`, {
+    timeout: 1500,
+  })
   return data
 }
 
