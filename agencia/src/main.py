@@ -49,7 +49,9 @@ async def lifespan(app):
     # Consumidor: processa creditos vindos de outras agencias via RabbitMQ
     await mensageria.assinar(id_agencia, transferencias_service.processar_credito_remoto)
     asyncio.create_task(bully.iniciar_eleicao())
+    heartbeat = asyncio.create_task(bully.iniciar_heartbeat())
     yield
+    heartbeat.cancel()
 
 
 app = FastAPI(title=f"ICEIBank - Agencia {id_agencia}", lifespan=lifespan)

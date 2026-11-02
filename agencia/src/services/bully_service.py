@@ -79,3 +79,30 @@ class ServicoBully:
 
     def obter_lider_atual(self):
         return self.lider_atual
+
+    async def verificar_lider(self):
+        if self.lider_atual is None:
+            await self.iniciar_eleicao()
+            return
+        if self.lider_atual == self.id_agencia:
+            return
+
+        lider_info = next(a for a in config.AGENCIAS if a["id"] == self.lider_atual)
+        try:
+            async with httpx.AsyncClient(timeout=TIMEOUT_S) as cliente:
+                resposta = await cliente.get(f"{lider_info['url']}/bully/lider")
+                resposta.raise_for_status()
+        except httpx.HTTPError:
+            vetor = self.relogio.evento_local()
+            self.registro.registrar(
+                "LIDER_NAO_RESPONDEU",
+                vetor,
+                {"liderAtual": self.lider_atual, "agencia": self.id_agencia},
+            )
+            self.lider_atual = None
+            await self.iniciar_eleicao()
+
+    async def iniciar_heartbeat(self, intervalo_s=3.0):
+        while True:
+            await asyncio.sleep(intervalo_s)
+            await self.verificar_lider()
