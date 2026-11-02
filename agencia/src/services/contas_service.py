@@ -1,7 +1,14 @@
 import config
 from models.conta import Conta
 from services import auth
-from services.erros import ContaDeOutraAgencia, ContaJaExiste, ContaNaoEncontrada
+from services.comparar_vetores import comparar_vetores
+from services.erros import (
+    ConflitoSincronizacao,
+    ContaDeOutraAgencia,
+    ContaJaExiste,
+    ContaNaoEncontrada,
+    OperacaoNaoSuportada,
+)
 
 
 class ContasService:
@@ -52,5 +59,39 @@ class ContasService:
         self.contas.salvar(conta)
         self.registro.registrar(
             "SAQUE", ts, {"id": id_conta, "valor": valor, "novoSaldo": conta.saldo}
+        )
+        return conta
+
+    def vetor_atual(self):
+        return self.relogio.obter_vetor_atual()
+
+    def sincronizar(self, id_conta, tipo, valor, vetor_conhecido):
+        conta = self.consultar(id_conta)
+
+        vetor_atual = self.relogio.obter_vetor_atual()
+        if comparar_vetores(vetor_conhecido, vetor_atual) != "IGUAIS":
+            # algo aconteceu na agencia desde a ultima leitura do app: nao aplica as cegas
+            raise ConflitoSincronizacao(
+                "Conflito detectado: o estado da conta mudou desde a ultima sincronizacao do app.",
+                {
+                    "vetorConhecido": vetor_conhecido,
+                    "vetorAtual": vetor_atual,
+                    "contaAtual": {"id": conta.id, "nomeAluno": conta.nome_aluno, "saldo": conta.saldo},
+                },
+            )
+
+        if tipo == "DEPOSITO":
+            conta.creditar(valor)
+        elif tipo == "SAQUE":
+            conta.debitar(valor)
+        else:
+            raise OperacaoNaoSuportada("Tipo de operacao pendente nao suportado.")
+
+        ts = self.relogio.evento_local()
+        self.contas.salvar(conta)
+        self.registro.registrar(
+            "SINCRONIZACAO_OFFLINE",
+            ts,
+            {"id": id_conta, "tipo": tipo, "valor": valor, "novoSaldo": conta.saldo},
         )
         return conta

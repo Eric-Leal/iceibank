@@ -1,11 +1,13 @@
 from fastapi.responses import JSONResponse
 
 from services.erros import (
+    ConflitoSincronizacao,
     ContaDeOutraAgencia,
     ContaJaExiste,
     ContaNaoEncontrada,
     CredenciaisInvalidas,
     ErroNegocio,
+    OperacaoNaoSuportada,
     SaldoInsuficiente,
     TokenInvalido,
 )
@@ -18,9 +20,12 @@ STATUS_POR_ERRO = {
     SaldoInsuficiente: 400,
     CredenciaisInvalidas: 401,
     TokenInvalido: 401,
+    OperacaoNaoSuportada: 400,
+    ConflitoSincronizacao: 409,
 }
 
 
 async def tratar_erro_negocio(request, erro: ErroNegocio):
     status = STATUS_POR_ERRO.get(type(erro), 400)
-    return JSONResponse(status_code=status, content={"detail": str(erro)})
+    extras = getattr(erro, "dados", {})
+    return JSONResponse(status_code=status, content={"detail": str(erro), **extras})

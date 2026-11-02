@@ -17,6 +17,9 @@ class RelogioVetorial:
         self.vetor[self.id_agencia] += 1
         return list(self.vetor)
 
+    def obter_vetor_atual(self):
+        return list(self.vetor)
+
 
 if __name__ == "__main__":
     ag0 = RelogioVetorial(id_agencia=0, numero_agencias=3)

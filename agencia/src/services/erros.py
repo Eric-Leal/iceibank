@@ -27,3 +27,13 @@ class CredenciaisInvalidas(ErroNegocio):
 
 class TokenInvalido(ErroNegocio):
     pass
+
+
+class OperacaoNaoSuportada(ErroNegocio):
+    pass
+
+
+class ConflitoSincronizacao(ErroNegocio):
+    def __init__(self, mensagem, dados):
+        super().__init__(mensagem)
+        self.dados = dados
