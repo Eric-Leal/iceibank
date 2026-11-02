@@ -11,21 +11,30 @@ import 'sessao.dart';
 const _timeout = Duration(seconds: 5);
 
 class ErroApi implements Exception {
-  ErroApi(this.mensagem);
+  ErroApi(this.mensagem, {this.offline = false, this.status, this.corpo});
   final String mensagem;
+  /// Sem resposta da agencia: a operacao pode ir para a fila offline.
+  final bool offline;
+  final int? status;
+  final Map<String, dynamic>? corpo;
 
   @override
   String toString() => mensagem;
 }
 
 class Conta {
-  Conta(this.id, this.nomeAluno, this.saldo);
+  Conta(this.id, this.nomeAluno, this.saldo, this.vetorAtual);
   final int id;
   final String nomeAluno;
   final double saldo;
+  final List<int>? vetorAtual;
 
-  factory Conta.deJson(Map<String, dynamic> json) =>
-      Conta(json['id'] as int, json['nomeAluno'] as String, (json['saldo'] as num).toDouble());
+  factory Conta.deJson(Map<String, dynamic> json) => Conta(
+        json['id'] as int,
+        json['nomeAluno'] as String,
+        (json['saldo'] as num).toDouble(),
+        json['vetorAtual'] == null ? null : List<int>.from(json['vetorAtual'] as List),
+      );
 }
 
 Future<dynamic> _requisitar(String metodo, String caminho, {Object? corpo}) async {
@@ -42,9 +51,11 @@ Future<dynamic> _requisitar(String metodo, String caminho, {Object? corpo}) asyn
             : http.post(uri, headers: cabecalhos, body: jsonEncode(corpo)))
         .timeout(_timeout);
   } on SocketException {
-    throw ErroApi('Agência fora do ar ou inacessível.');
+    throw ErroApi('Agência fora do ar ou inacessível.', offline: true);
   } on TimeoutException {
-    throw ErroApi('Agência fora do ar ou inacessível.');
+    throw ErroApi('Agência fora do ar ou inacessível.', offline: true);
+  } on http.ClientException {
+    throw ErroApi('Agência fora do ar ou inacessível.', offline: true);
   }
 
   final dados = resposta.body.isEmpty ? null : jsonDecode(utf8.decode(resposta.bodyBytes));
@@ -54,7 +65,11 @@ Future<dynamic> _requisitar(String metodo, String caminho, {Object? corpo}) asyn
       await sessao.sair();
       throw ErroApi(detalhe is String ? detalhe : 'Sessão expirada. Faça login novamente.');
     }
-    throw ErroApi(detalhe is String ? detalhe : 'Erro ${resposta.statusCode} na agência.');
+    throw ErroApi(
+      detalhe is String ? detalhe : 'Erro ${resposta.statusCode} na agência.',
+      status: resposta.statusCode,
+      corpo: dados is Map<String, dynamic> ? dados : null,
+    );
   }
   return dados;
 }
@@ -72,6 +87,10 @@ Future<Conta> depositar(int id, double valor) async =>
 
 Future<Conta> sacar(int id, double valor) async =>
     Conta.deJson(await _requisitar('POST', '/contas/$id/sacar', corpo: {'valor': valor}));
+
+Future<Conta> sincronizar(int id, String tipo, double valor, List<int> vetorConhecido) async =>
+    Conta.deJson(await _requisitar('POST', '/contas/$id/sincronizar',
+        corpo: {'tipo': tipo, 'valor': valor, 'vetorConhecido': vetorConhecido}));
 
 Future<String> transferir(int idOrigem, int idDestino, double valor, String idOperacao) async {
   final dados = await _requisitar('POST', '/transferencias', corpo: {

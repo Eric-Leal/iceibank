@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../api.dart' as api;
+import '../dados/banco_local.dart';
+import '../dados/sincronizador.dart';
 import '../formatar.dart';
 import '../sessao.dart';
 import '../widgets/mensagem.dart';
@@ -15,29 +17,22 @@ class TelaInicio extends StatefulWidget {
 }
 
 class _TelaInicioState extends State<TelaInicio> {
-  api.Conta? _conta;
+  late final Sincronizador _sync = Sincronizador(sessao.idConta!);
   bool _saldoVisivel = true;
   String? _erro;
   String? _sucesso;
-
-  int get _idConta => sessao.idConta!;
+  bool _avisoDePendente = false;
 
   @override
   void initState() {
     super.initState();
-    _buscar();
+    _sync.iniciar();
   }
 
-  Future<void> _buscar() async {
-    try {
-      final conta = await api.consultarSaldo(_idConta);
-      setState(() {
-        _conta = conta;
-        _erro = null;
-      });
-    } on api.ErroApi catch (e) {
-      if (mounted) setState(() => _erro = e.mensagem);
-    }
+  @override
+  void dispose() {
+    _sync.dispose();
+    super.dispose();
   }
 
   Future<void> _operar(bool deposito) async {
@@ -47,11 +42,14 @@ class _TelaInicioState extends State<TelaInicio> {
       _erro = null;
       _sucesso = null;
     });
+    final nome = deposito ? 'Depósito' : 'Saque';
     try {
-      final conta = deposito ? await api.depositar(_idConta, valor) : await api.sacar(_idConta, valor);
+      final ficouPendente = await _sync.registrar(deposito ? 'DEPOSITO' : 'SAQUE', valor);
       setState(() {
-        _conta = conta;
-        _sucesso = '${deposito ? 'Depósito' : 'Saque'} de ${formatarReais(valor)} realizado.';
+        _avisoDePendente = ficouPendente;
+        _sucesso = ficouPendente
+            ? '$nome de ${formatarReais(valor)} guardado. Será enviado quando a conexão voltar.'
+            : '$nome de ${formatarReais(valor)} realizado.';
       });
     } on api.ErroApi catch (e) {
       if (mounted) setState(() => _erro = e.mensagem);
@@ -93,75 +91,196 @@ class _TelaInicioState extends State<TelaInicio> {
 
   @override
   Widget build(BuildContext context) {
-    final cores = Theme.of(context).colorScheme;
-    final conta = _conta;
+    return ListenableBuilder(
+      listenable: _sync,
+      builder: (context, _) {
+        final conta = _sync.conta;
+        return Scaffold(
+          appBar: AppBar(
+            backgroundColor: Colors.white,
+            title: Text(conta == null ? 'Início' : 'Olá, ${conta.nomeAluno.split(' ').first}'),
+            actions: [
+              IconButton(tooltip: 'Sair', icon: const Icon(Icons.logout), onPressed: sessao.sair),
+            ],
+          ),
+          body: RefreshIndicator(
+            onRefresh: _sync.atualizar,
+            child: ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                if (!_sync.online) ...[
+                  const _AvisoOffline(),
+                  const SizedBox(height: 12),
+                ],
+                for (final texto in [_erro ?? _sync.erro].whereType<String>()) ...[
+                  Mensagem(texto, erro: true),
+                  const SizedBox(height: 12),
+                ],
+                // O aviso de "guardado" envelhece: some no conflito e vira confirmacao quando a fila esvazia.
+                if (_sucesso != null && !(_avisoDePendente && _sync.pendentes.isNotEmpty && !_sync.temPendentes)) ...[
+                  Mensagem(_avisoDePendente && _sync.pendentes.isEmpty
+                      ? 'Operações feitas offline sincronizadas com a agência.'
+                      : _sucesso!),
+                  const SizedBox(height: 12),
+                ],
+                _cartaoSaldo(context),
+                if (_sync.pendentes.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  _listaPendentes(),
+                ],
+                const SizedBox(height: 16),
+                const PainelLideranca(),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
 
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        title: Text(conta == null ? 'Início' : 'Olá, ${conta.nomeAluno.split(' ').first}'),
-        actions: [
-          IconButton(tooltip: 'Sair', icon: const Icon(Icons.logout), onPressed: sessao.sair),
+  Widget _cartaoSaldo(BuildContext context) {
+    final cores = Theme.of(context).colorScheme;
+    final saldo = _sync.saldoProvisorio;
+    return _Cartao(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            Text(_sync.temPendentes ? 'Saldo provisório' : 'Saldo',
+                style: TextStyle(color: cores.primary, fontWeight: FontWeight.w600)),
+            if (_sync.temPendentes) ...[const SizedBox(width: 8), const _Selo('pendente', Colors.amber)],
+          ]),
+          const SizedBox(height: 8),
+          Row(children: [
+            Text(
+              saldo == null ? '...' : (_saldoVisivel ? formatarReais(saldo) : 'R\$ •••••'),
+              style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w600),
+            ),
+            IconButton(
+              tooltip: _saldoVisivel ? 'Ocultar saldo' : 'Mostrar saldo',
+              color: cores.primary,
+              icon: Icon(_saldoVisivel ? Icons.visibility_outlined : Icons.visibility_off_outlined),
+              onPressed: () => setState(() => _saldoVisivel = !_saldoVisivel),
+            ),
+          ]),
+          Text('Conta #${sessao.idConta} · Agência ${sessao.idAgencia}',
+              style: const TextStyle(color: Colors.black54)),
+          const SizedBox(height: 20),
+          Row(children: [
+            _Atalho(icone: Icons.add, rotulo: 'Depositar', aoTocar: () => _operar(true)),
+            _Atalho(icone: Icons.remove, rotulo: 'Sacar', aoTocar: () => _operar(false)),
+            _Atalho(
+              icone: Icons.swap_horiz,
+              rotulo: 'Transferir',
+              aoTocar: () async {
+                await Navigator.push(context, MaterialPageRoute(builder: (_) => const TelaTransferencia()));
+                _sync.atualizar();
+              },
+            ),
+          ]),
         ],
       ),
-      body: RefreshIndicator(
-        onRefresh: _buscar,
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            if (_erro != null) ...[Mensagem(_erro!, erro: true), const SizedBox(height: 12)],
-            if (_sucesso != null) ...[Mensagem(_sucesso!), const SizedBox(height: 12)],
-            Card(
-              elevation: 0,
-              color: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-                side: BorderSide(color: Colors.grey.shade300),
+    );
+  }
+
+  Widget _listaPendentes() {
+    return _Cartao(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Aguardando sincronização', style: TextStyle(fontWeight: FontWeight.w600)),
+          for (final p in _sync.pendentes) ...[
+            const Divider(height: 24),
+            Row(children: [
+              Icon(
+                p.status == StatusPendente.pendente ? Icons.schedule : Icons.error_outline,
+                color: p.status == StatusPendente.pendente ? Colors.amber.shade800 : Colors.red,
               ),
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Saldo', style: TextStyle(color: cores.primary, fontWeight: FontWeight.w600)),
-                    const SizedBox(height: 8),
-                    Row(children: [
-                      Text(
-                        conta == null ? '...' : (_saldoVisivel ? formatarReais(conta.saldo) : 'R\$ •••••'),
-                        style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w600),
-                      ),
-                      IconButton(
-                        tooltip: _saldoVisivel ? 'Ocultar saldo' : 'Mostrar saldo',
-                        color: cores.primary,
-                        icon: Icon(_saldoVisivel ? Icons.visibility_outlined : Icons.visibility_off_outlined),
-                        onPressed: () => setState(() => _saldoVisivel = !_saldoVisivel),
-                      ),
-                    ]),
-                    Text('Conta #$_idConta · Agência ${sessao.idAgencia}',
-                        style: const TextStyle(color: Colors.black54)),
-                    const SizedBox(height: 20),
-                    Row(children: [
-                      _Atalho(icone: Icons.add, rotulo: 'Depositar', aoTocar: () => _operar(true)),
-                      _Atalho(icone: Icons.remove, rotulo: 'Sacar', aoTocar: () => _operar(false)),
-                      _Atalho(
-                        icone: Icons.swap_horiz,
-                        rotulo: 'Transferir',
-                        aoTocar: () async {
-                          await Navigator.push(
-                              context, MaterialPageRoute(builder: (_) => const TelaTransferencia()));
-                          _buscar();
-                        },
-                      ),
-                    ]),
-                  ],
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('${p.tipo == 'DEPOSITO' ? 'Depósito' : 'Saque'} de ${formatarReais(p.valor)}',
+                      style: const TextStyle(fontWeight: FontWeight.w500)),
+                  Text(
+                    p.status == StatusPendente.pendente ? 'Será enviado automaticamente' : 'Não aplicado: ${p.erro}',
+                    style: TextStyle(
+                        fontSize: 12, color: p.status == StatusPendente.pendente ? Colors.black54 : Colors.red),
+                  ),
+                ]),
+              ),
+            ]),
+            if (p.status == StatusPendente.conflito) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Saldo real na agência: ${formatarReais(_sync.conta?.saldo ?? 0)}. '
+                'Confira antes de reenviar.',
+                style: const TextStyle(fontSize: 12),
+              ),
+              Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+                TextButton(onPressed: () => _sync.descartar(p), child: const Text('Descartar')),
+                FilledButton.tonal(
+                  style: FilledButton.styleFrom(minimumSize: const Size(0, 40)),
+                  onPressed: () => _sync.tentarDeNovo(p),
+                  child: const Text('Reenviar'),
                 ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            const PainelLideranca(),
+              ]),
+            ],
           ],
-        ),
+        ],
       ),
+    );
+  }
+}
+
+class _AvisoOffline extends StatelessWidget {
+  const _AvisoOffline();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(color: Colors.grey.shade200, borderRadius: BorderRadius.circular(10)),
+      child: const Row(children: [
+        Icon(Icons.cloud_off, size: 20),
+        SizedBox(width: 10),
+        Expanded(child: Text('Sem conexão com a agência. Mostrando o último saldo conhecido.')),
+      ]),
+    );
+  }
+}
+
+class _Selo extends StatelessWidget {
+  const _Selo(this.texto, this.cor);
+
+  final String texto;
+  final MaterialColor cor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(color: cor.shade100, borderRadius: BorderRadius.circular(20)),
+      child: Text(texto, style: TextStyle(fontSize: 11, color: cor.shade900, fontWeight: FontWeight.w600)),
+    );
+  }
+}
+
+class _Cartao extends StatelessWidget {
+  const _Cartao({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      elevation: 0,
+      margin: EdgeInsets.zero,
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: Colors.grey.shade300),
+      ),
+      child: Padding(padding: const EdgeInsets.all(20), child: child),
     );
   }
 }

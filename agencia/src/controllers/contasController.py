@@ -58,13 +58,13 @@ def depositar(
     id_conta: int, dados: Valor, token=Depends(autenticado), servico=Depends(contas_service)
 ):
     exige_dono(token, id_conta)
-    return para_resposta(servico.depositar(id_conta, dados.valor))
+    return para_resposta(servico.depositar(id_conta, dados.valor), servico.vetor_atual())
 
 
 @router.post("/contas/{id_conta}/sacar", response_model=ContaResposta)
 def sacar(id_conta: int, dados: Valor, token=Depends(autenticado), servico=Depends(contas_service)):
     exige_dono(token, id_conta)
-    return para_resposta(servico.sacar(id_conta, dados.valor))
+    return para_resposta(servico.sacar(id_conta, dados.valor), servico.vetor_atual())
 
 
 @router.post("/contas/{id_conta}/sincronizar", response_model=ContaResposta)

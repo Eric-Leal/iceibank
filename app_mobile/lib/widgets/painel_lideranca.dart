@@ -84,7 +84,11 @@ class _PainelLiderancaState extends State<PainelLideranca> {
               const SizedBox(width: 12),
               Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(
-                  !_consultou ? 'Consultando...' : (_lider == null ? 'Sem líder' : 'Agência $_lider'),
+                  !_consultou
+                      ? 'Consultando...'
+                      : !_ativas.contains(true)
+                          ? 'Sem conexão'
+                          : (_lider == null ? 'Sem líder' : 'Agência $_lider'),
                   style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
                 ),
                 const Text('Eleita pelo algoritmo de Bully',
