@@ -3,3 +3,4 @@ uvicorn
 pyjwt
 python-dotenv
 aio-pika
+httpx

@@ -1,3 +1,4 @@
+import asyncio
 import os
 import sys
 from contextlib import asynccontextmanager
@@ -7,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 import config
 from controllers.authController import router as auth_router
+from controllers.bullyController import router as bully_router
 from controllers.contasController import router as contas_router
 from controllers.erros import tratar_erro_negocio
 from controllers.transferenciasController import router as transferencias_router
@@ -14,6 +16,7 @@ from repositories.contas_repository import ContasRepository
 from repositories.transferencias_repository import TransferenciasRepository
 from services import mensageria
 from services.auth import AuthService
+from services.bully_service import ServicoBully
 from services.contas_service import ContasService
 from services.erros import ErroNegocio
 from services.registro_eventos import RegistroEventos
@@ -38,12 +41,14 @@ contas_service = ContasService(id_agencia, contas, relogio, registro)
 transferencias_service = TransferenciasService(
     id_agencia, contas, transferencias, relogio, registro, mensageria
 )
+bully = ServicoBully(id_agencia, relogio, registro)
 
 
 @asynccontextmanager
 async def lifespan(app):
     # Consumidor: processa creditos vindos de outras agencias via RabbitMQ
     await mensageria.assinar(id_agencia, transferencias_service.processar_credito_remoto)
+    asyncio.create_task(bully.iniciar_eleicao())
     yield
 
 
@@ -61,8 +66,10 @@ app.add_middleware(
 app.state.auth_service = auth_service
 app.state.contas_service = contas_service
 app.state.transferencias_service = transferencias_service
+app.state.bully = bully
 
 app.include_router(auth_router)
+app.include_router(bully_router)
 app.include_router(contas_router)
 app.include_router(transferencias_router)
 
