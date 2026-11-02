@@ -18,3 +18,5 @@ agencia/data/*.jsonl
 # Sistema
 Thumbs.db
 desktop.ini
+
+.claude/
