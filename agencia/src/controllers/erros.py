@@ -7,6 +7,7 @@ from services.erros import (
     ContaNaoEncontrada,
     CredenciaisInvalidas,
     ErroNegocio,
+    LimiteOfflineExcedido,
     OperacaoNaoSuportada,
     SaldoInsuficiente,
     TokenInvalido,
@@ -21,6 +22,7 @@ STATUS_POR_ERRO = {
     CredenciaisInvalidas: 401,
     TokenInvalido: 401,
     OperacaoNaoSuportada: 400,
+    LimiteOfflineExcedido: 422,
     ConflitoSincronizacao: 409,
 }
 

@@ -4,6 +4,8 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
 
 import '../core/api.dart' as api;
+import '../core/config.dart';
+import '../shared/utils/formatar.dart';
 import 'banco_local.dart';
 
 const _intervaloNovaTentativa = Duration(seconds: 10);
@@ -76,9 +78,26 @@ class Sincronizador extends ChangeNotifier {
       final base = conta;
       if (!e.offline || base == null) rethrow;
       online = false;
+      _validarLimiteOffline(tipo, valor);
       await bancoLocal.enfileirar(idConta, tipo, valor, base.vetor);
       await _recarregarFila();
       return true;
+    }
+  }
+
+  /// Soma os saques ja na fila: varios saques pequenos nao podem furar o limite.
+  void _validarLimiteOffline(String tipo, double valor) {
+    final naFila = pendentes.where((p) => p.status == StatusPendente.pendente);
+    if (naFila.length >= maxOperacoesOffline) {
+      throw api.ErroApi(
+          'Sem conexão: limite de $maxOperacoesOffline operações aguardando sincronização.');
+    }
+    if (tipo != 'SAQUE') return;
+    final sacado = naFila.where((p) => p.tipo == 'SAQUE').fold(0.0, (s, p) => s + p.valor);
+    if (sacado + valor > limiteSaqueOffline) {
+      final restante = limiteSaqueOffline - sacado;
+      throw api.ErroApi('Sem conexão: saque offline limitado a ${formatarReais(limiteSaqueOffline)}. '
+          'Disponível agora: ${formatarReais(restante)}.');
     }
   }
 

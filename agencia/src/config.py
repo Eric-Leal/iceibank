@@ -22,6 +22,10 @@ def agencia_responsavel(id_conta):
     return id_conta % NUMERO_AGENCIAS
 
 
+# Funcionalidade adicional do Sprint 3: saque feito offline nao teve o saldo
+# conferido pela agencia, entao so e aceito na sincronizacao ate este valor.
+LIMITE_SAQUE_OFFLINE = 200
+
 # Frontend (Parte G): origens autorizadas a chamar esta API pelo navegador
 ORIGENS_FRONTEND = ["http://localhost:5173"]
 

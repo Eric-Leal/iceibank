@@ -33,6 +33,10 @@ class OperacaoNaoSuportada(ErroNegocio):
     pass
 
 
+class LimiteOfflineExcedido(ErroNegocio):
+    pass
+
+
 class ConflitoSincronizacao(ErroNegocio):
     def __init__(self, mensagem, dados):
         super().__init__(mensagem)

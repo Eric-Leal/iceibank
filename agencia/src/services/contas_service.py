@@ -7,6 +7,7 @@ from services.erros import (
     ContaDeOutraAgencia,
     ContaJaExiste,
     ContaNaoEncontrada,
+    LimiteOfflineExcedido,
     OperacaoNaoSuportada,
 )
 
@@ -67,6 +68,12 @@ class ContasService:
 
     def sincronizar(self, id_conta, tipo, valor, vetor_conhecido):
         conta = self.consultar(id_conta)
+
+        # O app ja barra isso, mas o servidor nao confia no cliente.
+        if tipo == "SAQUE" and valor > config.LIMITE_SAQUE_OFFLINE:
+            raise LimiteOfflineExcedido(
+                f"Saque offline acima do limite de R$ {config.LIMITE_SAQUE_OFFLINE}."
+            )
 
         vetor_atual = self.relogio.obter_vetor_atual()
         if comparar_vetores(vetor_conhecido, vetor_atual) != "IGUAIS":
