@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'sessao.dart';
+import 'core/sessao.dart';
 import 'telas/inicio.dart';
 import 'telas/login.dart';
 

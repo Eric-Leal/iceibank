@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
 
-import '../api.dart' as api;
+import '../core/api.dart' as api;
 import 'banco_local.dart';
 
 const _intervaloNovaTentativa = Duration(seconds: 10);

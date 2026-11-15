@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 
-import '../api.dart' as api;
+import '../core/api.dart' as api;
 import '../dados/banco_local.dart';
 import '../dados/sincronizador.dart';
-import '../formatar.dart';
-import '../sessao.dart';
-import '../widgets/mensagem.dart';
-import '../widgets/painel_lideranca.dart';
+import '../shared/utils/formatar.dart';
+import '../core/sessao.dart';
+import '../shared/widgets/mensagem.dart';
+import '../shared/widgets/painel_lideranca.dart';
 import 'transferencia.dart';
 
 class TelaInicio extends StatefulWidget {

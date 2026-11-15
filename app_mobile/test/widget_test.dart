@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:iceibank/formatar.dart';
+import 'package:iceibank/shared/utils/formatar.dart';
 
 void main() {
   test('formata no padrao brasileiro', () {

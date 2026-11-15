@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
-import '../api.dart' as api;
-import '../config.dart';
-import '../sessao.dart';
-import '../widgets/mensagem.dart';
+import '../core/api.dart' as api;
+import '../core/config.dart';
+import '../core/sessao.dart';
+import '../shared/widgets/mensagem.dart';
 
 class TelaTransferencia extends StatefulWidget {
   const TelaTransferencia({super.key});
