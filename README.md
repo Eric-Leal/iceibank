@@ -76,9 +76,9 @@ Funcionalidades:
 - Interface web consumindo a API autenticada, com escolha da agência de acesso
 - Idempotência na origem (transferência reenviada) e no destino (mensagem de crédito entregue duas vezes)
 - Eleição de líder entre as agências pelo algoritmo de Bully, com heartbeat e failover automático
-- App Flutter com o fluxo bancário e um painel ao vivo da líder e das agências ativas
+- App Flutter com o fluxo bancário e um painel ao vivo da líder e das agências ativas (indicador de agências: funcionalidade adicional do Sprint 3)
 - Modo offline-first no app: fila local em SQLite, saldo provisório e sincronização automática com detecção de conflito por vetor
-- Limite para saques feitos offline (funcionalidade adicional do Sprint 3)
+- Limite para saques feitos offline (funcionalidade adicional complementar do Sprint 3)
 
 O que mudou do Sprint 2 para o Sprint 3:
 
@@ -247,7 +247,7 @@ Sem conexão, depósito e saque não dão erro:
 
 Transferência offline não entra na fila, porque mexe em duas contas e possivelmente em duas agências.
 
-**Limite offline (funcionalidade adicional).** Uma operação offline não teve o saldo conferido pela agência. Por isso o app aceita no máximo **R$ 200** em saques somados na fila e no máximo **5** operações pendentes (`core/config.dart`). O backend também recusa com **422** um saque acima de `LIMITE_SAQUE_OFFLINE` no `/sincronizar`, porque não confia no cliente. Depósito offline continua livre.
+**Limite offline (funcionalidade adicional complementar).** Uma operação offline não teve o saldo conferido pela agência. Por isso o app aceita no máximo **R$ 200** em saques somados na fila e no máximo **5** operações pendentes (`core/config.dart`). O backend também recusa com **422** um saque acima de `LIMITE_SAQUE_OFFLINE` no `/sincronizar`, porque não confia no cliente. Depósito offline continua livre.
 
 ## Endpoints
 

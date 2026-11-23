@@ -177,7 +177,17 @@
 
 ## Funcionalidade adicional (seção 2.1)
 
-**Limite para operações offline.** Sem conexão, o app aceita no máximo R$ 200,00 em saques somados na fila e no máximo 5 operações aguardando sincronização. Depósito offline continua liberado.
+**Indicador de agências ativas.** Além da líder, o painel de liderança mostra quais das 3 agências estão respondendo agora, com "Online" em verde ou "Fora do ar" em vermelho. Ele está no app (`app_mobile/lib/widgets/painel_lideranca.dart`) e no frontend web (`frontend/src/components/PainelLideranca.vue`).
+
+Escolhi essa porque o painel já consultava `/bully/lider` nas três agências, para ter um plano B quando uma estivesse fora do ar. Saber quem respondeu sai da mesma consulta, sem nenhuma requisição a mais. E ela deixa o failover visível: quando derrubo a líder, a agência aparece "Fora do ar" e o nome da nova líder muda no mesmo painel. Quando nenhuma das três responde, o painel mostra "Sem conexão" em vez de "Sem líder", para não confundir falta de rede com falta de eleição.
+
+Agência 2 derrubada: o painel mostra a Agência 1 como líder e a 2 "Fora do ar", sem tocar na tela:
+
+![Indicador de agências ativas com a agência 2 fora do ar](evidencias/sprint3/funcionalidade-adicional-indicador.png)
+
+### Complemento: limite para operações offline
+
+Sem conexão, o app aceita no máximo R$ 200,00 em saques somados na fila e no máximo 5 operações aguardando sincronização. Depósito offline continua liberado.
 
 Escolhi essa porque é o risco que a Parte F cria. Uma operação offline foi feita sem a agência conferir o saldo, e pode chegar depois de outras mudanças na conta. No caso do saque, a pessoa pode tirar o mesmo dinheiro em dois aparelhos, e a agência só descobre quando já é tarde. Depósito não tem esse risco, porque não tira dinheiro de ninguém. Bancos reais fazem parecido: operação sem confirmação do servidor tem teto.
 
